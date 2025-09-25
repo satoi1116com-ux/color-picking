@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>階層的色選択実験（デバッグ強化版）</title>
+  <style>
+    body{font-family:system-ui,-apple-system,"Helvetica Neue",Segoe UI,Roboto,"Noto Sans JP",Meiryo,Arial; margin:16px; transition:background 0.25s ease,color 0.25s ease}
+    h1{font-size:1.2rem}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+    label{font-size:0.95rem}
+    #colorArea{display:flex;gap:12px;justify-content:center;margin:18px 0}
+    .colorPatch{width:28vw; height:28vw; max-width:220px; max-height:220px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.15); display:flex;align-items:center;justify-content:center; font-weight:700; color:#222; cursor:pointer; user-select:none; outline:4px solid transparent; transition:transform .12s ease, outline-color .12s ease}
+    .colorPatch:hover{transform:translateY(-4px)}
+    .colorPatch.selected{outline-color:rgba(0,0,0,0.35)}
+    .meta{font-size:0.9rem;margin-top:6px}
+    #log{white-space:pre-wrap;background:#f8f8f8;padding:8px;border-radius:6px;max-height:200px;overflow:auto;font-size:0.85rem}
+    button{padding:8px 12px;border-radius:6px;border:1px solid #ccc;background:white;cursor:pointer}
+    button.primary{background:#007bff;color:white;border-color:#007bff}
+    .small{font-size:0.85rem;padding:6px 8px}
+    .inline{display:inline-flex;align-items:center;gap:8px}
+    footer{margin-top:18px;color:#666;font-size:0.85rem}
+    #confirmBar{display:flex;gap:8px;align-items:center;justify-content:center;margin-top:10px}
+    #confirmBtn{padding:10px 14px;border-radius:6px;border:1px solid #666;background:#eee;cursor:not-allowed}
+    #cancelBtn{padding:6px 10px;border-radius:6px;background:white;border:1px solid #ccc}
+    #debugOverlay{position:fixed;right:12px;bottom:12px;width:320px;max-width:40vw;max-height:40vh;overflow:auto;background:rgba(0,0,0,0.8);color:#0f0;padding:8px;border-radius:8px;font-family:monospace;font-size:12px;z-index:9999}
+    #statusLine{font-weight:700}
+  </style>
+</head>
+<body>
+  <h1>階層的色選択実験（デバッグ強化版）</h1>
+  <p>ボタンが反応しない問題を踏まえ、デバッグ表示と自動読み込みを追加しました。下記の手順でテストしてください。</p>
+
+  <div class="controls">
+    <label>オーディオファイル (複数可)： <input id="audioFiles" type="file" accept="audio/*" multiple></label>
+    <label class="inline"><input type="checkbox" id="shuffleTrials"> トライアル順をシャッフル</label>
+    <label class="inline"><input type="checkbox" id="practice"> 練習モード（データ保存しない）</label>
+    <button id="loadFiles" class="small">読み込み</button>
+    <button id="startExp" class="primary small">実験開始</button>
+    <button id="downloadCSV" class="small">CSV ダウンロード</button>
+    <button id="resetAll" class="small">リセット</button>
+  </div>
+
+  <div class="meta">
+    <div id="statusLine">状態: 初期化中...</div>
+    <div>現在のトライアル：<span id="trialInfo">-</span></div>
+    <div>音声：<span id="audioName">(未選択)</span> <button id="playAudio" class="small">▶ 再生</button> <button id="pauseAudio" class="small">⏸ 停止</button></div>
+    <div>段階：<span id="stepInfo">-</span> / 8</div>
+    <div>説明：各段階で変わる属性（色相 / 彩度 / 明度）を意識して選んでください。選択後、決定ボタンで確定します。</div>
+  </div>
+
+  <div id="colorArea"></div>
+
+  <div id="confirmBar">
+    <button id="confirmBtn" disabled>決定 (Enter)</button>
+    <button id="cancelBtn" disabled>選択をキャンセル (Esc)</button>
+  </div>
+
+  <div class="inline" style="gap:12px;margin-top:6px">
+    <div>反応時間 (各段階)：<span id="lastRT">-</span> ms</div>
+    <div>合計反応時間：<span id="totalRT">-</span> ms</div>
+  </div>
+
+  <h3>結果ログ</h3>
+  <div id="log">（ここに各トライアル結果が追加されます）</div>
+
+  <footer>注意：実験を公開で実施する場合は倫理審査等に従ってください。画面の色は表示環境により変わります。</footer>
+
+  <div id="debugOverlay" aria-hidden="false"></div>
+
+<script>
+// --- デバッグ強化版スクリプト ---
+(function(){
+  const debug = document.getElementById('debugOverlay');
+  function dbg(msg){
+    const t = new Date().toISOString().slice(11,23);
+    debug.textContent = t + ' ' + msg + '\n' + debug.textContent;
+    console.log('[DBG]', msg);
+  }
+  window.addEventListener('error', function(e){ dbg('ERROR: ' + (e.message || e)); });
+  window.addEventListener('unhandledrejection', function(e){ dbg('PromiseRejection: ' + (e.reason || e)); });
+
+  // DOM elems
+  const audioInput = document.getElementById('audioFiles');
+  const loadBtn = document.getElementById('loadFiles');
+  const startBtn = document.getElementById('startExp');
+  const downloadBtn = document.getElementById('downloadCSV');
+  const resetBtn = document.getElementById('resetAll');
+  const colorArea = document.getElementById('colorArea');
+  const audioNameSpan = document.getElementById('audioName');
+  const trialInfo = document.getElementById('trialInfo');
+  const stepInfo = document.getElementById('stepInfo');
+  const logDiv = document.getElementById('log');
+  const lastRTspan = document.getElementById('lastRT');
+  const totalRTspan = document.getElementById('totalRT');
+  const playBtn = document.getElementById('playAudio');
+  const pauseBtn = document.getElementById('pauseAudio');
+  const shuffleCheckbox = document.getElementById('shuffleTrials');
+  const practiceCheckbox = document.getElementById('practice');
+  const confirmBtn = document.getElementById('confirmBtn');
+  const cancelBtn = document.getElementById('cancelBtn');
+  const statusLine = document.getElementById('statusLine');
+
+  // state
+  let audioElements = [];
+  let trialsOrder = [];
+  let currentTrialIndex = -1;
+  let results = [];
+  let currentPath = [];
+  let startTimeStep = null;
+  let stepRTs = [];
+  let totalRT = 0;
+  let audioElt = new Audio();
+  let inExperiment = false;
+  let selectedCandidate = null;
+
+  // color params
+  const baseHues = [0, 120, 240];
+  const hueDeltas = [0,30,15,8,4,2,1,0.5];
+  const satBase = 70; const lightBase = 50;
+  const stepAttribute = ['hue','hue','hue','saturation','saturation','lightness','lightness','final'];
+
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+  function pathToHSL_separated(path){ const filled = path.concat(Array(8-path.length).fill(1)); let H = baseHues[filled[0]]; let S = satBase; let L = lightBase; for(let i=1;i<8;i++){ const m = filled[i]-1; const attr = stepAttribute[i]; if(attr==='hue'){ const delta = hueDeltas[i] || 5; H += m*delta; } else if(attr==='saturation'){ const satChange = (i===3)?18:8; S += m*satChange; } else if(attr==='lightness'){ const lightChange = (i===5)?12:6; L += m*lightChange; } else if(attr==='final'){ H += m*1.5; S += m*2; L += m*1.2; } } H = (H%360+360)%360; S = clamp(Math.round(S),8,95); L = clamp(Math.round(L),3,95); return {H,S,L}; }
+  function hslToCss(hsl){ return `hsl(${hsl.H.toFixed(1)} ${hsl.S}% ${hsl.L}%)`; }
+  function hslToHex(hsl){ const h=hsl.H/360,s=hsl.S/100,l=hsl.L/100; function hue2rgb(p,q,t){ if(t<0) t+=1; if(t>1) t-=1; if(t<1/6) return p+(q-p)*6*t; if(t<1/2) return q; if(t<2/3) return p+(q-p)*(2/3-t)*6; return p; } let r,g,b; if(s==0){ r=g=b=l; } else { const q = l<0.5 ? l*(1+s) : l+s - l*s; const p = 2*l - q; r=hue2rgb(p,q,h+1/3); g=hue2rgb(p,q,h); b=hue2rgb(p,q,h-1/3); } const toHex = x => Math.round(x*255).toString(16).padStart(2,'0'); return `#${toHex(r)}${toHex(g)}${toHex(b)}`; }
+
+  function setStatus(msg){ statusLine.textContent = '状態: ' + msg; dbg(statusLine.textContent); }
+  function setPageBackground(cssColor, hsl){ document.body.style.background = cssColor; const textColor = (hsl.L > 60) ? '#111' : '#fff'; document.body.style.color = textColor; }
+
+  function clearSelectionUI(){ document.querySelectorAll('.colorPatch.selected').forEach(el=>el.classList.remove('selected')); selectedCandidate = null; confirmBtn.disabled = true; confirmBtn.style.cursor = 'not-allowed'; cancelBtn.disabled = true; cancelBtn.style.cursor = 'not-allowed'; }
+
+  function createColorPatches(step){ try{
+    selectedCandidate = null; window._stepHistory = window._stepHistory || []; const options = [0,1,2].map(digit=>({digit})); for(const opt of options){ const path = currentPath.concat(opt.digit); const hsl = pathToHSL_separated(path); opt.hsl = hsl; opt.css = hslToCss(hsl); opt.hex = hslToHex(hsl); opt.attr = stepAttribute[currentPath.length] || 'unknown'; } shuffleArray(options); colorArea.innerHTML=''; options.forEach((opt, idx)=>{ const d = document.createElement('div'); d.className='colorPatch'; d.style.background = opt.css; d.dataset.digit = opt.digit; d.dataset.pos = idx; d.dataset.attr = opt.attr; d.style.color = (opt.hsl.L > 60) ? '#111' : '#fff'; d.innerHTML = `<div style="text-align:center">(${idx+1})<br><small>${opt.hex}</small></div>`; d.addEventListener('click', ()=> onChooseOption(opt, idx, d)); colorArea.appendChild(d); }); clearSelectionUI(); stepInfo.textContent = (currentPath.length+1) + ' / 8'; startTimeStep = performance.now(); setStatus('選択中: Step ' + (currentPath.length+1)); }catch(e){ dbg('createColorPatches error: '+e); }
+  }
+
+  function onChooseOption(opt, displayedPos, elem){ selectedCandidate = Object.assign({}, opt, {displayedPos}); document.querySelectorAll('.colorPatch').forEach(el=>el.classList.remove('selected')); elem.classList.add('selected'); setPageBackground(opt.css, opt.hsl); confirmBtn.disabled = false; confirmBtn.style.cursor = 'pointer'; cancelBtn.disabled = false; cancelBtn.style.cursor = 'pointer'; setStatus('選択済み（未決定）: Step ' + (currentPath.length+1)); }
+  function onCancelSelection(){ document.querySelectorAll('.colorPatch.selected').forEach(el=>el.classList.remove('selected')); if(currentPath.length>0){ const lastHSL = pathToHSL_separated(currentPath); setPageBackground(hslToCss(lastHSL), lastHSL); } else { document.body.style.background=''; document.body.style.color=''; } selectedCandidate=null; confirmBtn.disabled=true; cancelBtn.disabled=true; setStatus('選択キャンセル'); }
+
+  function confirmSelection(){ if(!selectedCandidate) return; const rt = Math.round(performance.now() - startTimeStep); stepRTs.push(rt); lastRTspan.textContent = rt; const stepRecord = { step: currentPath.length+1, chosenDigit: selectedCandidate.digit, displayedPos: selectedCandidate.displayedPos, candidateHSL: selectedCandidate.hsl, candidateHex: selectedCandidate.hex, attr: selectedCandidate.attr, rt }; window._stepHistory = window._stepHistory || []; window._stepHistory.push(stepRecord); currentPath.push(selectedCandidate.digit); selectedCandidate=null; confirmBtn.disabled=true; cancelBtn.disabled=true; document.querySelectorAll('.colorPatch.selected').forEach(el=>el.classList.remove('selected')); if(currentPath.length>=8){ finishTrial(); } else { createColorPatches(currentPath.length); } }
+
+  function finishTrial(){ totalRT = stepRTs.reduce((a,b)=>a+b,0); totalRTspan.textContent = totalRT; const finalHSL = pathToHSL_separated(currentPath); const finalHex = hslToHex(finalHSL); const currentAudio = audioElements[trialsOrder[currentTrialIndex]]; const trialRecord = { trial: currentTrialIndex+1, audioName: currentAudio ? currentAudio.name : '(none)', path: currentPath.slice(), stepRTs: stepRTs.slice(), totalRT, finalHSL, finalHex, timestamp: new Date().toISOString(), practice: practiceCheckbox.checked, stepHistory: window._stepHistory || [] }; if(!practiceCheckbox.checked) results.push(trialRecord); logDiv.textContent += `Trial ${trialRecord.trial} | ${trialRecord.audioName} | path=${trialRecord.path.join('')} | final=${trialRecord.finalHex} | RTms=${trialRecord.totalRT}\n`; window._stepHistory=[]; inExperiment=false; setStatus('試行完了: ' + trialRecord.trial); setTimeout(()=>{ nextTrial(); }, 600); }
+
+  function nextTrial(){ try{ currentPath=[]; stepRTs=[]; lastRTspan.textContent='-'; totalRTspan.textContent='-'; currentTrialIndex++; if(currentTrialIndex>=trialsOrder.length){ trialInfo.textContent='完了'; audioNameSpan.textContent='(完了)'; colorArea.innerHTML='<div style="text-align:center;width:100%">全トライアルを終了しました。</div>'; inExperiment=false; setStatus('全トライアル完了'); return; } const curIndex = trialsOrder[currentTrialIndex]; const audioObj = audioElements[curIndex]; trialInfo.textContent = `${currentTrialIndex+1} / ${trialsOrder.length}`; audioNameSpan.textContent = audioObj ? audioObj.name : '(none)'; if(audioObj){ audioElt.src = audioObj.url; audioElt.load(); audioElt.oncanplay = ()=>{ try{ audioElt.play().catch(()=>{ dbg('autoplay blocked or failed'); }); }catch(e){ dbg('audio play error:'+e); } } } setTimeout(()=>{ inExperiment=true; createColorPatches(0); }, 200); setStatus('トライアル開始: '+(currentTrialIndex+1)); }catch(e){ dbg('nextTrial error:'+e); } }
+
+  window.addEventListener('keydown', (e)=>{ if(!inExperiment) return; if(e.key==='1' || e.key==='2' || e.key==='3'){ const k = Number(e.key)-1; const patches = Array.from(document.querySelectorAll('.colorPatch')); const patch = patches[k]; if(patch) patch.click(); } if(e.key==='Enter'){ if(!confirmBtn.disabled) confirmSelection(); } if(e.key==='Escape'){ if(!cancelBtn.disabled) onCancelSelection(); } });
+
+  function shuffleArray(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]] } }
+
+  // Event handlers robustly attached
+  function safeAdd(el,ev,fn){ try{ el.addEventListener(ev,fn); }catch(e){ dbg('addEventListener failed for '+ev+': '+e); } }
+
+	safeAdd(loadBtn, 'click', () => {
+  try {
+    const files = Array.from(audioInput.files || []);
+    audioElements = files.map(f => ({ file: f, name: f.name, url: URL.createObjectURL(f) }));
+    logDiv.textContent = '読み込んだ音声ファイル:\n' +
+      (audioElements.length ? audioElements.map((a, i) => `${i+1}. ${a.name}`).join('\n') : '(0 files)') +
+      '\n';
+    setStatus('ファイル読み込み完了: ' + audioElements.length + ' files');
+    dbg('loaded ' + audioElements.length + ' files');
+  } catch (e) {
+    dbg('loadBtn click error: ' + e);
+  }
+});
+
+  // auto-load on file selection as well
+  safeAdd(audioInput,'change', ()=>{ loadBtn.click(); });
+
+  safeAdd(startBtn,'click', ()=>{ try{ trialsOrder = audioElements.map((_,i)=>i); if(trialsOrder.length===0){ trialsOrder=[0]; audioElements=[]; } if(shuffleCheckbox.checked) shuffleArray(trialsOrder); currentTrialIndex=-1; results=[]; logDiv.textContent=''; setStatus('実験開始'); nextTrial(); }catch(e){ dbg('startBtn error:'+e); } });
+
+  safeAdd(playBtn,'click', ()=>{ try{ audioElt.play().catch(()=>{ dbg('play blocked'); }); }catch(e){ dbg('play error:'+e); } });
+  safeAdd(pauseBtn,'click', ()=>{ try{ audioElt.pause(); }catch(e){ dbg('pause error:'+e); } });
+
+  safeAdd(confirmBtn,'click', ()=>{ try{ if(!confirmBtn.disabled) confirmSelection(); }catch(e){ dbg('confirm click error:'+e); } });
+  safeAdd(cancelBtn,'click', ()=>{ try{ if(!cancelBtn.disabled) onCancelSelection(); }catch(e){ dbg('cancel click error:'+e); } });
+
+  safeAdd(resetBtn,'click', ()=>{ try{ if(confirm('全てリセットしますか？（読み込んだ音声と結果を消します）')){ audioElements.forEach(a=>{ if(a.url) URL.revokeObjectURL(a.url); }); audioElements=[]; trialsOrder=[]; currentTrialIndex=-1; results=[]; currentPath=[]; inExperiment=false; audioNameSpan.textContent='(未選択)'; trialInfo.textContent='-'; stepInfo.textContent='-'; colorArea.innerHTML=''; logDiv.textContent=''; document.body.style.background=''; document.body.style.color=''; setStatus('リセット完了'); dbg('reset'); } }catch(e){ dbg('reset error:'+e); } });
+
+  safeAdd(downloadBtn,'click', ()=>{ try{ if(results.length===0){ alert('保存データがありません。'); return; } const rows=[]; rows.push(['trial','audioName','path','finalHex','finalH','finalS','finalL','stepRTs_ms','totalRT_ms','timestamp','practice','stepCandidates']); results.forEach(r=>{ const sc = JSON.stringify(r.stepHistory); rows.push([ r.trial, r.audioName, r.path.join(''), r.finalHex, r.finalHSL.H.toFixed(2), r.finalHSL.S, r.finalHSL.L, r.stepRTs.join('|'), r.totalRT, r.timestamp, r.practice, sc ]); }); const csv = rows.map(r=>r.map(field=>`"${String(field).replace(/"/g,'""')}"`).join(',')).join('\n'); const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'}); const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='color_selection_results.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); setStatus('CSV 作成'); dbg('csv created'); }catch(e){ dbg('download error:'+e); } });
+
+  // initialize
+  setStatus('初期化完了 — ファイル選択後「読み込み」またはファイル選択で自動読み込み'); dbg('script initialized');
+})();
+</script>
+</body>
+</html>
