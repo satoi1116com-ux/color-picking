@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>階層的色選択実験 (3^8 = 6561 可能性, 構造化)</title>
+  <style>
+    body{font-family:system-ui,-apple-system,"Helvetica Neue",Segoe UI,Roboto,"Noto Sans JP",Meiryo,Arial; margin:16px;}
+    h1{font-size:1.2rem}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+    label{font-size:0.95rem}
+    #colorArea{display:flex;gap:12px;justify-content:center;margin:18px 0}
+    .colorPatch{width:28vw; height:28vw; max-width:220px; max-height:220px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.15); display:flex;align-items:center;justify-content:center; font-weight:700; color:#222; cursor:pointer; user-select:none}
+    .meta{font-size:0.9rem;margin-top:6px}
+    #log{white-space:pre-wrap;background:#f8f8f8;padding:8px;border-radius:6px;max-height:200px;overflow:auto;font-size:0.85rem}
+    button{padding:8px 12px;border-radius:6px;border:1px solid #ccc;background:white;cursor:pointer}
+    button.primary{background:#007bff;color:white;border-color:#007bff}
+    .small{font-size:0.85rem;padding:6px 8px}
+    .inline{display:inline-flex;align-items:center;gap:8px}
+    footer{margin-top:18px;color:#666;font-size:0.85rem}
+  </style>
+</head>
+<body>
+  <h1>階層的色選択実験（拡張：8段階）</h1>
+  <p>説明：音を聴いた後、画面上の3つの色パッチから最も合う色を<b>8回</b>階層的に選びます。構成は以下。
+  <ul hidden>
+    <li>Step1-3：色相（hue）の決定（粗→中→細）</li>
+    <li>Step4-5：彩度（saturation）の決定（粗→細）</li>
+    <li>Step6-7：明度（lightness）の決定（粗→細）</li>
+    <li>Step8：最終調整（小さな微調整）</li>
+  </ul>
+  キー操作：<strong>1/2/3</strong> を押すか、色パッチをクリックしてください。</p>
+
+  <div class="controls">
+    <label>オーディオファイル (複数可)： <input id="audioFiles" type="file" accept="audio/*" multiple></label>
+    <label class="inline"><input type="checkbox" id="shuffleTrials"> トライアル順をシャッフル</label>
+    <label class="inline"><input type="checkbox" id="practice"> 練習モード（データ保存しない）</label>
+    <button id="loadFiles" class="small">読み込み</button>
+    <button id="startExp" class="primary small">実験開始</button>
+    <button id="downloadCSV" class="small">CSV ダウンロード</button>
+    <button id="resetAll" class="small">リセット</button>
+  </div>
+
+  <div class="meta">
+    <div>現在のトライアル：<span id="trialInfo">-</span></div>
+    <div>音声：<span id="audioName">(未選択)</span> <button id="playAudio" class="small">▶ 再生</button> <button id="pauseAudio" class="small">⏸ 停止</button></div>
+    <div>段階：<span id="stepInfo">-</span> / 8</div>
+    <div>説明：各段階で変わる属性（色相 / 彩度 / 明度）を意識して選んでください。練習トライアルで操作に慣れてください。</div>
+  </div>
+
+  <div id="colorArea"></div>
+
+  <div class="inline" style="gap:12px;margin-top:6px">
+    <div>反応時間 (各段階)：<span id="lastRT">-</span> ms</div>
+    <div>合計反応時間：<span id="totalRT">-</span> ms</div>
+  </div>
+
+  <h3>結果ログ</h3>
+  <div id="log">（ここに各トライアル結果が追加されます）</div>
+
+  <footer>注意：実験を公開で実施する場合は倫理審査等に従ってください。画面の色は表示環境により変わります。</footer>
+
+<script>
+// --- 実験スクリプト（8段階化版） ---
+const audioInput = document.getElementById('audioFiles');
+const loadBtn = document.getElementById('loadFiles');
+const startBtn = document.getElementById('startExp');
+const downloadBtn = document.getElementById('downloadCSV');
+const resetBtn = document.getElementById('resetAll');
+const colorArea = document.getElementById('colorArea');
+const audioNameSpan = document.getElementById('audioName');
+const trialInfo = document.getElementById('trialInfo');
+const stepInfo = document.getElementById('stepInfo');
+const logDiv = document.getElementById('log');
+const lastRTspan = document.getElementById('lastRT');
+const totalRTspan = document.getElementById('totalRT');
+const playBtn = document.getElementById('playAudio');
+const pauseBtn = document.getElementById('pauseAudio');
+const shuffleCheckbox = document.getElementById('shuffleTrials');
+const practiceCheckbox = document.getElementById('practice');
+
+let audioElements = [];
+let trialsOrder = [];
+let currentTrialIndex = -1;
+let results = [];
+let currentPath = [];
+let startTimeStep = null;
+let stepRTs = [];
+let totalRT = 0;
+let audioElt = new Audio();
+let inExperiment = false;
+
+// color generation parameters
+const baseHues = [0, 120, 240]; // 赤, 緑, 青
+// hueDeltas: index corresponds to step index (0..7). value used when that step's attribute==='hue'
+const hueDeltas = [0, 30, 15, 8, 4, 2, 1, 0.5];
+const satBase = 70; const lightBase = 50;
+
+// stepAttribute: which attribute changes at each step (0-based index for 8 steps)
+// Step1(index0)-Step3(index2): 'hue'
+// Step4-5(index3-4): 'saturation'
+// Step6-7(index5-6): 'lightness'
+// Step8(index7): 'final' (微調整：small hue/sat/light adjustments possible)
+const stepAttribute = ['hue','hue','hue','saturation','saturation','lightness','lightness','final'];
+
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+
+function pathToHSL_separated(path){
+  // path: array of digits 0/1/2 length up to 8
+  // ensure we have length 8 by filling middle choices (1)
+  const filled = path.concat(Array(8-path.length).fill(1));
+  // base hue (decided by first digit)
+  let H = baseHues[filled[0]];
+  let S = satBase; let L = lightBase;
+  for(let i=1;i<8;i++){
+    const m = filled[i] - 1; // -1/0/+1
+    const attr = stepAttribute[i];
+    if(attr === 'hue'){
+      const delta = hueDeltas[i] || 5;
+      H += m * delta;
+    } else if(attr === 'saturation'){
+      // coarse/fine saturation changes per step (example values)
+      const satChange = (i===3) ? 18 : 8; // step4 large, step5 small
+      S += m * satChange;
+    } else if(attr === 'lightness'){
+      const lightChange = (i===5) ? 12 : 6; // step6 coarse, step7 fine
+      L += m * lightChange;
+    } else if(attr === 'final'){
+      // final微調整: small adjustments across attributes
+      H += m * 1.5; S += m * 2; L += m * 1.2;
+    }
+  }
+  H = (H % 360 + 360) % 360;
+  S = clamp(Math.round(S), 8, 95);
+  L = clamp(Math.round(L), 3, 95);
+  return {H,S,L};
+}
+
+function hslToCss(hsl){ return `hsl(${hsl.H.toFixed(1)} ${hsl.S}% ${hsl.L}%)`; }
+function hslToHex(hsl){
+  const h = hsl.H/360, s = hsl.S/100, l = hsl.L/100;
+  function hue2rgb(p,q,t){ if(t<0) t+=1; if(t>1) t-=1; if(t<1/6) return p+(q-p)*6*t; if(t<1/2) return q; if(t<2/3) return p+(q-p)*(2/3-t)*6; return p; }
+  let r,g,b;
+  if(s==0){ r=g=b=l; } else {
+    const q = l<0.5 ? l*(1+s) : l+s - l*s;
+    const p = 2*l - q;
+    r = hue2rgb(p,q,h+1/3);
+    g = hue2rgb(p,q,h);
+    b = hue2rgb(p,q,h-1/3);
+  }
+  const toHex = x => Math.round(x*255).toString(16).padStart(2,'0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function shuffleArray(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]} }
+
+function createColorPatches(step){
+  // step: current step index (0-based)
+  const options = [0,1,2].map(digit=>({digit}));
+  for(const opt of options){
+    const path = currentPath.concat(opt.digit);
+    const hsl = pathToHSL_separated(path);
+    opt.hsl = hsl;
+    opt.css = hslToCss(hsl);
+    opt.hex = hslToHex(hsl);
+    // also attach attribute info for logging
+    opt.attr = stepAttribute[currentPath.length] || 'unknown';
+  }
+  shuffleArray(options);
+  colorArea.innerHTML='';
+  options.forEach((opt, idx)=>{
+    const d = document.createElement('div');
+    d.className='colorPatch';
+    d.style.background = opt.css;
+    d.dataset.digit = opt.digit;
+    d.dataset.pos = idx;
+    d.dataset.attr = opt.attr;
+    d.style.color = (opt.hsl.L > 60) ? '#111' : '#fff';
+    d.innerHTML = `<div style="text-align:center">(${idx+1})<br><small>${opt.hex}</small></div>`;
+    d.addEventListener('click', ()=> onSelectOption(opt.digit, idx, opt));
+    colorArea.appendChild(d);
+  });
+  stepInfo.textContent = (currentPath.length+1) + ' / 8';
+  startTimeStep = performance.now();
+}
+
+function onSelectOption(digit, displayedPos, opt){
+  if(!inExperiment) return;
+  const rt = Math.round(performance.now() - startTimeStep);
+  stepRTs.push(rt);
+  lastRTspan.textContent = rt;
+  // record detailed step info for logging
+  const stepRecord = {
+    step: currentPath.length+1,
+    chosenDigit: digit,
+    displayedPos,
+    candidateHSL: opt.hsl,
+    candidateHex: opt.hex,
+    attr: opt.attr,
+    rt
+  };
+  // attach to a temporary array to store per-step candidates (we'll include in final record)
+  if(!window._stepHistory) window._stepHistory = [];
+  window._stepHistory.push(stepRecord);
+
+  currentPath.push(digit);
+  if(currentPath.length >= 8){
+    finishTrial();
+  } else {
+    createColorPatches(currentPath.length);
+  }
+}
+
+function finishTrial(){
+  totalRT = stepRTs.reduce((a,b)=>a+b,0);
+  totalRTspan.textContent = totalRT;
+  const finalHSL = pathToHSL_separated(currentPath);
+  const finalHex = hslToHex(finalHSL);
+  const currentAudio = audioElements[trialsOrder[currentTrialIndex]];
+  const trialRecord = {
+    trial: currentTrialIndex+1,
+    audioName: currentAudio ? currentAudio.name : '(none)',
+    path: currentPath.slice(),
+    stepRTs: stepRTs.slice(),
+    totalRT,
+    finalHSL,
+    finalHex,
+    timestamp: new Date().toISOString(),
+    practice: practiceCheckbox.checked,
+    stepHistory: window._stepHistory || []
+  };
+  if(!practiceCheckbox.checked) results.push(trialRecord);
+  logDiv.textContent += `Trial ${trialRecord.trial} | ${trialRecord.audioName} | path=${trialRecord.path.join('')} | final=${trialRecord.finalHex} | RTms=${trialRecord.totalRT}\n`;
+  // reset temp history
+  window._stepHistory = [];
+  inExperiment = false;
+  setTimeout(()=>{ nextTrial(); }, 600);
+}
+
+function nextTrial(){
+  currentPath = [];
+  stepRTs = [];
+  lastRTspan.textContent = '-';
+  totalRTspan.textContent = '-';
+  currentTrialIndex++;
+  if(currentTrialIndex >= trialsOrder.length){
+    trialInfo.textContent = '完了';
+    audioNameSpan.textContent = '(完了)';
+    colorArea.innerHTML = '<div style="text-align:center;width:100%">全トライアルを終了しました。</div>';
+    inExperiment = false; return;
+  }
+  const curIndex = trialsOrder[currentTrialIndex];
+  const audioObj = audioElements[curIndex];
+  trialInfo.textContent = `${currentTrialIndex+1} / ${trialsOrder.length}`;
+  audioNameSpan.textContent = audioObj ? audioObj.name : '(none)';
+  if(audioObj){ audioElt.src = audioObj.url; audioElt.load(); audioElt.oncanplay = ()=>{ audioElt.play().catch(()=>{}); } }
+  setTimeout(()=>{ inExperiment = true; createColorPatches(0); }, 400);
+}
+
+window.addEventListener('keydown', (e)=>{
+  if(!inExperiment) return;
+  if(e.key === '1' || e.key === '2' || e.key === '3'){
+    const k = Number(e.key) - 1;
+    const patches = Array.from(document.querySelectorAll('.colorPatch'));
+    const patch = patches[k]; if(patch) patch.click();
+  }
+});
+
+loadBtn.addEventListener('click', ()=>{
+  const files = Array.from(audioInput.files);
+  audioElements = files.map(f=>({file:f, name:f.name, url:URL.createObjectURL(f)}));
+  logDiv.textContent = '読み込んだ音声ファイル:\n' + audioElements.map((a,i)=>`${i+1}. ${a.name}`).join('\n') + '\n';
+});
+
+startBtn.addEventListener('click', ()=>{
+  trialsOrder = audioElements.map((_,i)=>i);
+  if(trialsOrder.length===0){ trialsOrder = [0]; audioElements = []; }
+  if(shuffleCheckbox.checked) shuffleArray(trialsOrder);
+  currentTrialIndex = -1; results = []; logDiv.textContent = ''; nextTrial();
+});
+
+playBtn.addEventListener('click', ()=>{ audioElt.play().catch(()=>{}); });
+pauseBtn.addEventListener('click', ()=>{ audioElt.pause(); });
+
+resetBtn.addEventListener('click', ()=>{ if(confirm('全てリセットしますか？（読み込んだ音声と結果を消します）')){ audioElements.forEach(a=>{ if(a.url) URL.revokeObjectURL(a.url) }); audioElements = []; trialsOrder = []; currentTrialIndex=-1; results=[]; currentPath=[]; inExperiment=false; audioNameSpan.textContent='(未選択)'; trialInfo.textContent='-'; stepInfo.textContent='-'; colorArea.innerHTML=''; logDiv.textContent=''; } });
+
+// CSV download - include stepHistory (candidates) in CSV by flattening
+downloadBtn.addEventListener('click', ()=>{
+  if(results.length===0){ alert('保存データがありません。'); return; }
+  const rows = [];
+  rows.push(['trial','audioName','path','finalHex','finalH','finalS','finalL','stepRTs_ms','totalRT_ms','timestamp','practice','stepCandidates']);
+  results.forEach(r=>{
+    // stepCandidates: JSON string of stepHistory
+    const sc = JSON.stringify(r.stepHistory);
+    rows.push([
+      r.trial, r.audioName, r.path.join(''), r.finalHex, r.finalHSL.H.toFixed(2), r.finalHSL.S, r.finalHSL.L, r.stepRTs.join('|'), r.totalRT, r.timestamp, r.practice, sc
+    ]);
+  });
+  const csv = rows.map(r=>r.map(field=>`"${String(field).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'color_selection_results.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+});
+
+</script>
+</body>
+</html>
