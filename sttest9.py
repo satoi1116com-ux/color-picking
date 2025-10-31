@@ -55,7 +55,7 @@ def clamp(v, a, b):
 
 def path_to_hsl_separated(path: List[int]):
     baseHues = [0, 120, 240]
-    hueDeltas = [0, 30, 15, 8, 4, 2, 1, 0.5]
+    hueDeltas = [0, 60, 15, 8, 4, 2, 1, 0.5]
     satBase = 70
     lightBase = 50
     stepAttribute = ['hue','hue','hue','saturation','saturation','lightness','lightness','final']
@@ -629,4 +629,5 @@ elif st.session_state.get('page') == 'end':
         safe_rerun()
 
 st.markdown("---")
+
 st.caption("注: ブラウザの自動再生ポリシーにより autoplay が効かないことがあります。音が鳴らない場合は手動で再生してください。")
