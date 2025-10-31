@@ -55,10 +55,11 @@ def clamp(v, a, b):
 
 def path_to_hsl_separated(path: List[int]):
     baseHues = [0, 120, 240]
-    hueDeltas = [0, 60, 15, 8, 4, 2, 1, 0.5]
+    hueDeltas = [0, 60, 15, 8, 4, 2, 1, 0.5] 
     satBase = 70
     lightBase = 50
-    stepAttribute = ['hue','hue','hue','saturation','saturation','lightness','lightness','final']
+    # 変更点1: 明度と彩度の順番を入れ替え
+    stepAttribute = ['hue','hue','hue','lightness','lightness','saturation','saturation','final']
     filled = path + [1] * (8 - len(path))
     H = baseHues[filled[0]] if filled[0] < len(baseHues) else 0
     S = satBase
@@ -69,11 +70,14 @@ def path_to_hsl_separated(path: List[int]):
         if attr == 'hue':
             delta = hueDeltas[i] if i < len(hueDeltas) else 5
             H += m * delta
+        # 変更点2: ロジックを新しい順番に合わせる
         elif attr == 'saturation':
-            satChange = 18 if i == 3 else 8
+            # 6,7段階目(i=5,6)が彩度になる
+            satChange = 25 if i == 5 else 15 
             S += m * satChange
         elif attr == 'lightness':
-            lightChange = 12 if i == 5 else 6
+            # 4,5段階目(i=3,4)が明度になる
+            lightChange = 20 if i == 3 else 10
             L += m * lightChange
         elif attr == 'final':
             H += m * 1.5
@@ -629,5 +633,4 @@ elif st.session_state.get('page') == 'end':
         safe_rerun()
 
 st.markdown("---")
-
 st.caption("注: ブラウザの自動再生ポリシーにより autoplay が効かないことがあります。音が鳴らない場合は手動で再生してください。")
