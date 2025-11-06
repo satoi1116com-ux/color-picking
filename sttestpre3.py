@@ -1096,21 +1096,17 @@ elif st.session_state.get('page') == 'final_survey':
         
         if submitted:
             is_valid = all([
-                st.session_state.q8.strip(), st.session_state.q9.strip(), st.session_state.q10.strip(), 
-                st.session_state.q11.strip(), st.session_state.q12.strip(), st.session_state.q15.strip(), 
-                st.session_state.q16.strip(), st.session_state.q17.strip(), st.session_state.q18.strip()
+                q8.strip(), q9.strip(), q10.strip(), q11.strip(), q12.strip(),
+                q15.strip(), q16.strip(), q17.strip(), q18.strip()
             ])
             
             if not is_valid:
                 st.error("未入力の項目があります。すべての質問にご回答ください。")
             else:
-                # 辞書に保存 (st.session_state.qX を直接参照)
                 meta_answers = st.session_state.setdefault('meta_answers', {})
                 meta_answers.update({
-                    'q7': st.session_state.q7, 'q8': st.session_state.q8, 'q9': st.session_state.q9, 
-                    'q10': st.session_state.q10, 'q11': st.session_state.q11, 'q12': st.session_state.q12,
-                    'q13': st.session_state.q13, 'q14': st.session_state.q14, 'q15': st.session_state.q15, 
-                    'q16': st.session_state.q16, 'q17': st.session_state.q17, 'q18': st.session_state.q18
+                    'q7': q7, 'q8': q8, 'q9': q9, 'q10': q10, 'q11': q11, 'q12': q12,
+                    'q13': q13, 'q14': q14, 'q15': q15, 'q16': q16, 'q17': q17, 'q18': q18
                 })
 
                 row_data = {
@@ -1123,7 +1119,7 @@ elif st.session_state.get('page') == 'final_survey':
                 }
                 
                 try:
-                    append_meta_csv_and_sheet(row_data) # ★関数呼び出し
+                    append_meta_csv(row_data)
                     go_to('end')
                 except Exception as e:
                     st.error(f"メタデータの保存に失敗しました: {e}")
@@ -1136,3 +1132,4 @@ elif st.session_state.get('page') == 'end':
 
 st.markdown("---")
 st.caption("注: 問題が発生した場合は実験を中断してください。")
+
