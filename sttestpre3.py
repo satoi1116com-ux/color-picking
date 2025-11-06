@@ -1119,7 +1119,7 @@ elif st.session_state.get('page') == 'final_survey':
                 }
                 
                 try:
-                    append_meta_csv(row_data)
+                    append_meta_csv_and_sheet(row_data)
                     go_to('end')
                 except Exception as e:
                     st.error(f"メタデータの保存に失敗しました: {e}")
@@ -1132,4 +1132,5 @@ elif st.session_state.get('page') == 'end':
 
 st.markdown("---")
 st.caption("注: 問題が発生した場合は実験を中断してください。")
+
 
