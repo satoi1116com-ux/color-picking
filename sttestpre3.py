@@ -121,95 +121,57 @@ def safe_filename(name: str) -> str:
     name = os.path.basename(name)
     return "".join(c for c in name if c.isalnum() or c in "._-")
 
-@st.cache_resource(show_spinner=False)
-def init_gsheets_client():
-    """
-    st.secrets に
-      - gcp_service_account (JSON文字列)
-      - gspread_spreadsheet_id (スプレッドシートID)
-    を入れておくこと。
-    戻り値: (client, spreadsheet) または (None, None)  — 初期化失敗時は None を返す
-    """
+@st.cache_resource
+def get_gspread_client():
     try:
-        sa_json_text = st.secrets.get("gcp_service_account", None)
-        ssid = st.secrets.get("gspread_spreadsheet_id", None)
-        if not sa_json_text or not ssid:
-            raise RuntimeError("st.secrets に gcp_service_account または gspread_spreadsheet_id がありません。")
-        sa_info = json.loads(sa_json_text)
-        scopes = ["https://www.googleapis.com/auth/spreadsheets",
-                  "https://www.googleapis.com/auth/drive"]
-        creds = Credentials.from_service_account_info(sa_info, scopes=scopes)
-        client = gspread.authorize(creds)
-        spreadsheet = client.open_by_key(ssid)
-        return client, spreadsheet
+        creds = st.secrets["gcp_service_account"]
+        key = st.secrets["google_sheet_key"]
+        gc = gspread.service_account_from_dict(creds)
+        sh = gc.open_by_key(key)
+        return sh
     except Exception as e:
-        # 初期化失敗はアプリは続行するが、Google 書き込みは行われない
-        st.error("Google Sheets の初期化に失敗しました（Secrets / API / 権限を確認してください）。")
-        st.write(traceback.format_exc())
-        return None, None
-
-# 初期化（1回だけ実行される）
-_gs_client, _gs_spreadsheet = init_gsheets_client()
-
-def _ensure_worksheet_and_header(spreadsheet, sheet_title: str, header: list):
-    """指定スプレッドシートにワークシートがなければ作り、ヘッダーを整備して返す。"""
-    try:
-        try:
-            ws = spreadsheet.worksheet(sheet_title)
-        except gspread.exceptions.WorksheetNotFound:
-            # 新規作成（行数/列数は動的に増やせるが初期値を指定）
-            ws = spreadsheet.add_worksheet(title=sheet_title, rows="1000", cols=str(len(header)))
-            ws.append_row(header, value_input_option='USER_ENTERED')
-        else:
-            # 既存シートの先頭行がヘッダらしくなければ挿入（簡易対応）
-            existing = ws.row_values(1)
-            if not existing or len(existing) < len(header):
-                ws.insert_row(header, index=1)
-        return ws
-    except Exception as e:
-        st.warning(f"ワークシート準備でエラー: {e}")
+        st.error(f"Google Sheets への接続に失敗しました: {e}")
         return None
 
-def _retry_append(ws, row_values, max_retries=3, backoff_base=0.5):
+def append_to_gsheet(worksheet_name: str, header: List[str], row_data: Dict):
     """
-    gspread append_row を信頼性高く行うため小さなリトライを行う。
+    指定されたワークシートにヘッダーを確認し、データを1行追記する
     """
-    for attempt in range(1, max_retries+1):
-        try:
-            ws.append_row(row_values, value_input_option='USER_ENTERED')
-            return True
-        except Exception as ex:
-            wait = backoff_base * (2 ** (attempt-1)) + (0.1 * attempt)
-            time.sleep(wait)
-            last_err = ex
-    st.warning(f"Google Sheets への書き込みを試みましたが失敗しました: {last_err}")
-    return False
+    sh = get_gspread_client()
+    if sh is None:
+        st.error("GSheet接続がないため、ログを保存できません。")
+        return
 
-def append_row_to_sheet(sheet_title: str, row_dict: dict, header: list):
-    """
-    sheet_title: ワークシート名
-    row_dict: 辞書（header の要素をキーとする）
-    header: ワークシートの列順
-    """
-    if _gs_spreadsheet is None:
-        # 初期化失敗または未設定 → 無視（ローカルCSVは残す）
-        return False
     try:
-        ws = _ensure_worksheet_and_header(_gs_spreadsheet, sheet_title, header)
-        if ws is None:
-            return False
-        row = [row_dict.get(col, "") for col in header]
-        return _retry_append(ws, row)
+        wks = sh.worksheet(worksheet_name)
+    except gspread.exceptions.WorksheetNotFound:
+        st.error(f"ワークシート '{worksheet_name}' が見つかりません。")
+        return
+    
+    try:
+        # 1. ヘッダー行が存在するか確認
+        # get_all_values() は遅いので、A1セルだけ確認する
+        header_check = wks.acell('A1').value
+        if header_check is None or header_check != header[0]:
+             # A1が空か、ヘッダーと一致しない場合はヘッダーを書き込む
+            wks.insert_row(header, 1)
+
+        # 2. 辞書 (row_data) を、ヘッダーの順序に沿ったリストに変換
+        values_to_append = [row_data.get(key, "") for key in header]
+        
+        # 3. 最終行に追記
+        wks.append_row(values_to_append, value_input_option='USER_ENTERED')
+        
     except Exception as e:
-        st.warning(f"Google Sheets 書き込み例外: {e}")
-        return False
+        # 同時書き込み競合などでエラーが起きても実験が停止しないようにする
+        st.error(f"'{worksheet_name}' へのログ書き込みに失敗: {e}")
 
 # ---------------- 既存CSV保存 + Google Sheets 両対応関数 ----------------
 # 既存の append_result_csv 等の代替として使います。呼び出し箇所を置換してください。
 
 def append_result_csv_and_sheet(row: dict):
     """段階的選択結果をローカルCSVに追記し、Google Sheets にも append する。"""
-    header = ['participant_id','trial','audioName','path','finalHex','finalH','finalS','finalL','stepRTs_ms','totalRT_ms','timestamp','practice','loop_playback_used']
+    header = ['participant_id','trial','audioName','path','finalHex','finalH','finalS','finalL','stepRTs_ms','totalRT_ms','timestamp','practice','loop_playback_used','reset_count']
     # ローカルCSV保存（既存の実装と同様）
     exists = os.path.exists(RESULTS_CSV)
     with open(RESULTS_CSV, 'a', newline='', encoding='utf-8') as f:
@@ -219,7 +181,7 @@ def append_result_csv_and_sheet(row: dict):
         writer.writerow(row)
     # Google Sheets 保存（失敗しても処理続行）
     try:
-        append_row_to_sheet("results", row, header)
+        append_to_gsheet("results", header, row)
     except Exception as e:
         st.warning(f"Google Sheets 書込失敗 (results): {e}")
 
@@ -233,7 +195,7 @@ def append_color_csv_and_sheet(row: dict):
             writer.writeheader()
         writer.writerow(row)
     try:
-        append_row_to_sheet("color_results", row, header)
+        append_to_gsheet("color_results", header, row)
     except Exception as e:
         st.warning(f"Google Sheets 書込失敗 (color_results): {e}")
 
@@ -248,7 +210,7 @@ def append_meta_csv_and_sheet(row: dict):
             writer.writeheader()
         writer.writerow(row)
     try:
-        append_row_to_sheet("meta_results", row, header)
+        append_to_gsheet("meta_results", header, row)
     except Exception as e:
         st.warning(f"Google Sheets 書込失敗 (meta_results): {e}")
 
