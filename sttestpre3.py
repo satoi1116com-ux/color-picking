@@ -121,6 +121,62 @@ def safe_filename(name: str) -> str:
     name = os.path.basename(name)
     return "".join(c for c in name if c.isalnum() or c in "._-")
 
+def create_non_repeating_trials(stimuli_indices: List[int], repeats: int) -> List[int]:
+    """
+    指定されたリストを `repeats` 回繰り返し、
+    連続する要素が決してないシャッフル済みリストを生成する。
+    """
+    # 1. フルリストを作成 (例: [0,1,2...7, 0,1,2...7])
+    trial_list = stimuli_indices * repeats
+    
+    # 2. 安全装置（万が一、修正が無限ループするのを防ぐ）
+    max_attempts = 10
+    
+    for attempt in range(max_attempts):
+        random.shuffle(trial_list) # まず全体をシャッフル
+        
+        has_repeats = False
+        for i in range(len(trial_list) - 1):
+            if trial_list[i] == trial_list[i+1]:
+                has_repeats = True
+                
+                # 連続する重複を発見
+                # i+1 の要素を、i とも i+1 とも異なる要素と交換する
+                
+                # まず前方にスワップ対象を探す
+                swap_idx = -1
+                for j in range(i + 2, len(trial_list)):
+                    if trial_list[j] != trial_list[i]:
+                        swap_idx = j
+                        break
+                
+                # 前方で見つからなければ後方に探す
+                if swap_idx == -1:
+                    for j in range(i - 1, -1, -1):
+                        if trial_list[j] != trial_list[i]:
+                            swap_idx = j
+                            break
+                
+                # スワップを実行
+                if swap_idx != -1:
+                    # i+1 (重複した後者) をスワップ
+                    temp = trial_list[i+1]
+                    trial_list[i+1] = trial_list[swap_idx]
+                    trial_list[swap_idx] = temp
+                else:
+                    # スワップ対象が見つからない（非常に稀）
+                    # ループを抜けて再シャッフル
+                    break 
+        
+        # 重複がなければループを終了
+        if not has_repeats:
+            return trial_list
+
+    # 10回試行しても失敗した場合（通常はあり得ない）
+    st.warning("連続重複の排除に失敗しました。通常のシャッフルを使用します。")
+    random.shuffle(trial_list) # 最終的なフォールバック
+    return trial_list
+
 @st.cache_resource
 def get_gspread_client():
     try:
@@ -187,7 +243,7 @@ def append_result_csv_and_sheet(row: dict):
 
 def append_color_csv_and_sheet(row: dict):
     """色選択結果をローカルCSVに追記し、Google Sheets にも append する。"""
-    header = ['participant_id','trial','audioName','pickedHex','pickedH','pickedS','pickedL','timestamp','loop_playback_used']
+    header = ['participant_id','trial','audioName','pickedHex','pickedH','pickedS','pickedL','timestamp','loop_playback_used', 'totalRT_ms']
     exists = os.path.exists(COLOR_RESULTS_CSV)
     with open(COLOR_RESULTS_CSV, 'a', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=header)
@@ -252,6 +308,8 @@ if 'audio_check_continuous_play' not in st.session_state:
     st.session_state['audio_check_continuous_play'] = False
 if 'reset_counts' not in st.session_state:
     st.session_state['reset_counts'] = {}
+if 'color_picker_start_time' not in st.session_state:
+    st.session_state['color_picker_start_time'] = None
 # ---------- uploads/ からの自動読み込み（参加者用） ----------
 if not st.session_state.get('audio_files'):
     try:
@@ -278,11 +336,18 @@ if not st.session_state.get('audio_files'):
             n = len(st.session_state['audio_files'])
             if n == 0:
                 st.session_state['trials_order'] = [None]
+                st.session_state['color_trials_order'] = [None]
             else:
-                st.session_state['trials_order'] = list(range(n))
-                if st.session_state['settings'].get('shuffle_trials', True):
-                    random.shuffle(st.session_state['trials_order'])
-                st.session_state['color_trials_order'] = st.session_state['trials_order'].copy()
+                base_indices = list(range(n))
+   
+                if n != 8:
+                    st.warning(f"警告: 8個の音刺激が期待されていましたが、{n}個見つかりました。{n}個の刺激を2回ずつ ({n*2}試行) 実行します。")
+
+                trials_order_16 = create_non_repeating_trials(base_indices, repeats=2)
+                st.session_state['trials_order'] = trials_order_16
+                
+                color_trials_order_16 = create_non_repeating_trials(base_indices, repeats=2)
+                st.session_state['color_trials_order'] = color_trials_order_16
 
 # ---------- UI: 管理者/参加者ページ選択（簡易） ----------
 st.title("色選択手法比較実験アプリ")
@@ -810,14 +875,19 @@ elif st.session_state.get('page') == 'stage':
                 options = [{'digit': d, 'hex': hsl_to_hex(path_to_hsl_separated(st.session_state['current_path'] + [d]))} for d in [0,1,2]]
                 cols = st.columns(3)
             
+            if st.session_state['step_start_time'] is None:
+                st.session_state['step_start_time'] = time.time()
             for i, opt in enumerate(options):
                 with cols[i]:
                     st.markdown(f'<div style="height:140px;border-radius:10px;background:{opt["hex"]};display:flex;align-items:center;justify-content:center;font-weight:bold;color:#000;margin-bottom:8px"></div>', unsafe_allow_html=True)
                     if st.button(f"この色を選ぶ ({i+1})", key=f"sel_{st.session_state['current_trial_index']}_{current_step_number}_{i}"):
                         if st.session_state['step_start_time'] is None: st.session_state['step_start_time'] = time.time()
+                        
                         rt_ms = int((time.time() - st.session_state['step_start_time'])*1000)
+                        
                         st.session_state['step_rts'].append(rt_ms)
                         st.session_state['current_path'].append(opt['digit'])
+                        
                         st.session_state['step_start_time'] = None
                         if len(st.session_state['current_path']) >= 8:
                             final_hsl = path_to_hsl_separated(st.session_state['current_path'])
@@ -826,7 +896,7 @@ elif st.session_state.get('page') == 'stage':
                             trial_record = {
                                 'participant_id': st.session_state.get('participant_id'), 
                                 'trial': st.session_state['current_trial_index']+1, 'audioName': audio_name,
-                                'path': ''.join(map(str,st.session_state['current_path'])), 'finalHex': hsl_to_hex(final_hsl),
+                                'path': ''.join(map(lambda d: str(d + 1), st.session_state['current_path'])), 'finalHex': hsl_to_hex(final_hsl),
                                 'finalH': round(final_hsl['H'],2), 'finalS': final_hsl['S'], 'finalL': final_hsl['L'],
                                 'stepRTs_ms': '|'.join(map(str,st.session_state.get('step_rts',[]))), 'totalRT_ms': sum(st.session_state.get('step_rts', [])),
                                 'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'), 'practice': False,
@@ -888,8 +958,11 @@ elif st.session_state.get('page') == 'color_picker':
             render_audio_player(audio_bytes, mime=audio_mime, autoplay=True, loop=False)
             if st.button("再生が終了したので、色選択に進む", key="cp_finish_listening"):
                 st.session_state['color_picker_listening_complete'] = True
+                st.session_state['color_picker_start_time'] = None
                 safe_rerun()
         else:
+            if st.session_state['color_picker_start_time'] is None:
+                st.session_state['color_picker_start_time'] = time.time()
             col1, col2 = st.columns([1,1])
             with col1:
                 st.markdown("**再生コントロール**")
@@ -907,6 +980,7 @@ elif st.session_state.get('page') == 'color_picker':
                 picked = st.color_picker(":arrow_down: 音に対して想起した色をカラーピッカーから選んでください", "#808080", key=f"picker_{st.session_state['color_trial_index']}",width="content")
                 
                 if st.button("この色を保存して次へ"):
+                    rt_ms = int((time.time() - st.session_state['color_picker_start_time'])*1000)
                     def hex_to_hsl(hexc):
                         hexc=hexc.lstrip('#'); r=int(hexc[0:2],16)/255.0; g=int(hexc[2:4],16)/255.0; b=int(hexc[4:6],16)/255.0
                         maxc,minc=max(r,g,b),min(r,g,b); l=(maxc+minc)/2
@@ -924,13 +998,15 @@ elif st.session_state.get('page') == 'color_picker':
                         'trial': st.session_state['color_trial_index']+1, 'audioName': audio_name,
                         'pickedHex': picked, 'pickedH': picked_hsl['H'], 'pickedS': picked_hsl['S'], 'pickedL': picked_hsl['L'],
                         'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'),
-                        'loop_playback_used': st.session_state.get('color_picker_continuous_play', False)
+                        'loop_playback_used': st.session_state.get('color_picker_continuous_play', False),
+                        'totalRT_ms': rt_ms
                     }
                     append_color_csv_and_sheet(row)
                     st.session_state['color_results'].append(row)
                     st.session_state['color_trial_index'] += 1
                     st.session_state['color_picker_listening_complete'] = False
                     st.session_state['color_picker_continuous_play'] = False
+                    st.session_state['color_picker_start_time'] = None
                     safe_rerun()
             with col2:
                 st.markdown("**色のプレビュー**")
@@ -1003,32 +1079,38 @@ elif st.session_state.get('page') == 'final_survey':
         q7 = st.radio("Q1.総合評価: 二つの色選択手法のうち、「音を聴いて想起した色を選ぶ」という作業に対して、どちらが色選択において総合的に適している手法だと感じましたか？", ("1: 段階的に色選択する手法", "2: カラーピッカーで直接選択する手法", "3: どちらともいえない"))
         q8 = st.text_input("Q2.総合評価の理由: Q1でそのように回答した理由を、具体的に教えてください")
         st.markdown("Q3.各手法の長所・短所")
-        q9 = st.text_input("A:段階的に色選択する手法 長所", key="q9")
+        st.markdown("A:段階的に色選択する手法")
+        q9 = st.text_input("長所", key="q9")
         q10 = st.text_input("短所", key="q10")
-        q11 = st.text_input("B:カラーピッカーで色選択する手法 長所", key="q11")
+        st.markdown("B:カラーピッカーで色選択する手法")
+        q11 = st.text_input("長所", key="q11")
         q12 = st.text_input("短所", key="q12")
         q13 = st.radio("Q7.年代", ("1: 10代", "2: 20代", "3: 30代", "4: 40代", "5: 50代", "6: 60代以上"))
         q14 = st.radio("Q8.性別", ("1: 男性", "2: 女性", "3: その他", "4: 選択しない"))
         st.markdown("Q9.デバイス環境について")
         q15 = st.text_input("・PC(デスクトップPCかノートPCか、OS、ブラウザ、画面サイズと解像度など)")
         q16 = st.text_input("・ヘッドホンまたはイヤホン(ヘッドホンかイヤホンか、有線か無線か、メーカー名、製品名など)")
-        q17 = st.text_input("Q10.音楽経験: 楽器の演奏経験（楽器名、年数）、歌唱経験、作曲やDTMの経験、バンド活動、音楽の学習歴（専門教育を受けた、独学など）など、音楽に関する経験を可能な範囲で詳しく教えてください。")
-        q18 = st.text_input("Q11.色彩・美術・デザイン経験: 絵画（油絵、水彩、イラストなど）、デザイン（グラフィック、Webなど）、写真、映像制作に関する学習歴や活動歴、色彩検定などの関連資格の有無など、色彩・美術・デザインに関する経験を可能な範囲で詳しく教えてください。")
+        q17 = st.text_input("Q10.音楽経験 : 楽器の演奏経験（楽器名、年数）、歌唱経験、作曲やDTMの経験、バンド活動、音楽の学習歴（専門教育を受けた、独学など）など、音楽に関する経験を可能な範囲で詳しく教えてください。")
+        q18 = st.text_input("Q11.色彩・美術・デザイン経験 : 絵画（油絵、水彩、イラストなど）、デザイン（グラフィック、Webなど）、写真、映像制作に関する学習歴や活動歴、色彩検定などの関連資格の有無、共感覚傾向の自己認識など、色彩・美術・デザインに関する経験を可能な範囲で詳しく教えてください。")
         submitted = st.form_submit_button("送信して終了")
         
         if submitted:
             is_valid = all([
-                q8.strip(), q9.strip(), q10.strip(), q11.strip(), q12.strip(),
-                q15.strip(), q16.strip(), q17.strip(), q18.strip()
+                st.session_state.q8.strip(), st.session_state.q9.strip(), st.session_state.q10.strip(), 
+                st.session_state.q11.strip(), st.session_state.q12.strip(), st.session_state.q15.strip(), 
+                st.session_state.q16.strip(), st.session_state.q17.strip(), st.session_state.q18.strip()
             ])
             
             if not is_valid:
                 st.error("未入力の項目があります。すべての質問にご回答ください。")
             else:
+                # 辞書に保存 (st.session_state.qX を直接参照)
                 meta_answers = st.session_state.setdefault('meta_answers', {})
                 meta_answers.update({
-                    'q7': q7, 'q8': q8, 'q9': q9, 'q10': q10, 'q11': q11, 'q12': q12,
-                    'q13': q13, 'q14': q14, 'q15': q15, 'q16': q16, 'q17': q17, 'q18': q18
+                    'q7': st.session_state.q7, 'q8': st.session_state.q8, 'q9': st.session_state.q9, 
+                    'q10': st.session_state.q10, 'q11': st.session_state.q11, 'q12': st.session_state.q12,
+                    'q13': st.session_state.q13, 'q14': st.session_state.q14, 'q15': st.session_state.q15, 
+                    'q16': st.session_state.q16, 'q17': st.session_state.q17, 'q18': st.session_state.q18
                 })
 
                 row_data = {
@@ -1041,7 +1123,7 @@ elif st.session_state.get('page') == 'final_survey':
                 }
                 
                 try:
-                    append_meta_csv_and_sheet(row_data)
+                    append_meta_csv_and_sheet(row_data) # ★関数呼び出し
                     go_to('end')
                 except Exception as e:
                     st.error(f"メタデータの保存に失敗しました: {e}")
