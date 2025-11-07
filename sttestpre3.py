@@ -11,7 +11,7 @@ import time
 import math
 
 # ---------- 設定 ----------
-st.set_page_config(page_title="階層的色選択実験", layout="wide")
+st.set_page_config(page_title="色選択手法比較実験", layout="wide")
 RESULTS_CSV = 'results.csv'
 COLOR_RESULTS_CSV = 'color_results.csv'
 UPLOAD_DIR = Path('uploads')
@@ -350,7 +350,7 @@ if not st.session_state.get('audio_files'):
                 st.session_state['color_trials_order'] = color_trials_order_16
 
 # ---------- UI: 管理者/参加者ページ選択（簡易） ----------
-st.title("色選択手法比較実験アプリ")
+st.title("色選択手法比較実験")
 st.markdown("---")
 
 def go_to(p):
@@ -838,7 +838,7 @@ elif st.session_state.get('page') == 'stage':
     else:
         idx = st.session_state['trials_order'][st.session_state['current_trial_index']]
         audio_name = '(なし)' if idx is None else st.session_state['audio_files'][idx]['name']
-        st.write(f"トライアル {st.session_state['current_trial_index']+1} / {len(st.session_state['trials_order'])} ")
+        st.write(f"**トライアル {st.session_state['current_trial_index']+1} / {len(st.session_state['trials_order'])} **")
         audio_bytes = None
         if idx is not None:
             audio_bytes = st.session_state['audio_files'][idx]['data']
@@ -869,7 +869,7 @@ elif st.session_state.get('page') == 'stage':
             st.markdown("---")
             st.markdown("### 色選択（8段階）")
             current_step_number = len(st.session_state.get('current_path', [])) + 1
-            st.write(f"段階 {current_step_number} / 8")
+            st.write(f"**段階 {current_step_number} / 8**")
 
             # 検討ポイント！！！！！！！！！！！
             if current_step_number > 1:
@@ -898,7 +898,7 @@ elif st.session_state.get('page') == 'stage':
             for i, opt in enumerate(options):
                 with cols[i]:
                     st.markdown(f'<div style="height:140px;border-radius:10px;background:{opt["hex"]};display:flex;align-items:center;justify-content:center;font-weight:bold;color:#000;margin-bottom:8px"></div>', unsafe_allow_html=True)
-                    if st.button(f"この色を選ぶ ({i+1})", key=f"sel_{st.session_state['current_trial_index']}_{current_step_number}_{i}"):
+                    if st.button(f"この色を選ぶ ", key=f"sel_{st.session_state['current_trial_index']}_{current_step_number}_{i}"):
                         if st.session_state['step_start_time'] is None: st.session_state['step_start_time'] = time.time()
                         
                         rt_ms = int((time.time() - st.session_state['step_start_time'])*1000)
@@ -962,7 +962,7 @@ elif st.session_state.get('page') == 'color_picker':
     else:
         cidx = st.session_state['color_trials_order'][st.session_state['color_trial_index']]
         audio_name = '(なし)' if cidx is None else st.session_state['audio_files'][cidx]['name']
-        st.write(f"トライアル {st.session_state['color_trial_index']+1} / {len(st.session_state['color_trials_order'])}")
+        st.write(f"**トライアル {st.session_state['color_trial_index']+1} / {len(st.session_state['color_trials_order'])}**")
         
         audio_bytes = None
         if cidx is not None:
@@ -996,7 +996,10 @@ elif st.session_state.get('page') == 'color_picker':
                     render_audio_player(audio_bytes, mime=audio_mime, autoplay=True, loop=True)
                 
                 picked = st.color_picker(":arrow_down: 音に対して想起した色をカラーピッカーから選んでください", "#808080", key=f"picker_{st.session_state['color_trial_index']}",width="content")
-                
+                st.markdown("\n")
+                st.markdown("\n")
+                st.markdown("\n")
+                st.markdown("\n")
                 if st.button("この色を保存して次へ"):
                     rt_ms = int((time.time() - st.session_state['color_picker_start_time'])*1000)
                     def hex_to_hsl(hexc):
@@ -1076,7 +1079,7 @@ elif st.session_state.get('page') == 'transition_page':
         この作業では、音を聴きながら、カラーピッカーを使って、想起した色を自由に1つ選びます。
         """
 
-    st.markdown(f"一つ目のタスクは終了です。必要な方は休憩時間を5分取ることができます。")
+    st.markdown(f"一つ目のタスクは終了です。**必要ならば休憩時間を5分取ってください。**")
     st.info(next_task_description)
     st.markdown("準備ができたら、下のボタンを押して次のタスクを開始してください。")
 
