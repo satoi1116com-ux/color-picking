@@ -1167,7 +1167,8 @@ elif st.session_state.get('page') == 'final_survey':
 elif st.session_state.get('page') == 'end':
     st.header("終了ページ")
     st.markdown("ご協力ありがとうございました。")
-
+    st.markdown("報酬支払いのためのIDは　aaa　です") 
 
 st.markdown("---")
+
 st.warning("注: 実験途中でのサイトの更新やボタンの連打は行わないでください。\n問題が発生した場合は実験を中断してください。")
