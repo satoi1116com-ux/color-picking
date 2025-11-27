@@ -48,7 +48,7 @@
 
     <div id="overlay">
         <div id="setup-screen">
-            <h2>実験2: 設定</h2>
+            <h2>実験2: 設定4</h2>
             <p>参加者ID: <input type="text" id="participant-id" value="test_user"></p>
             <p>実験条件: 
                 <select id="condition-select">
@@ -59,7 +59,13 @@
                 </select>
             </p>
             <p>音声ファイル数: <span id="audio-count">未ロード</span></p>
-            <button onclick="startExperiment()">実験を開始する</button>
+            
+            <div style="margin-top: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 5px; background: #f9f9f9;">
+                <strong>まずは練習を行ってください</strong><br>
+                <button onclick="startPractice()" style="background-color: #4CAF50; color: white;">練習・音量テストを開始</button>
+            </div>
+            <br>
+            <button onclick="startExperiment()">本番を開始する</button>
         </div>
 
         <div id="download-screen" class="hidden">
@@ -75,7 +81,7 @@
 
     <div id="ui-2d">
         <h3 id="trial-info-2d">Trial 1</h3>
-        <p>音を聴いて、想起する色を選んでください</p>
+        <p id="instruction-2d">音を聴いて、想起する色を選んでください</p>
         <button onclick="playCurrentAudio()" id="btn-play-2d">再生 (Play)</button>
         
         <div id="controls-2d" style="margin-top:15px; display:none;">
@@ -99,12 +105,10 @@
             <a-sphere id="env-sphere" radius="50" material="shader:flat; color:#808080; side:back" visible="false"></a-sphere>
             <a-grid width="20" height="20" divisions="20" material="shader:flat; color:#404040" position="0 0.01 0"></a-grid>
 
-            <a-entity id="control-panel" position="0 1.3 -2.5" rotation="-15 0 0" color-picker-panel>
-                
+            <a-entity id="control-panel" position="0 1.3 -1.5" rotation="-15 0 0" color-picker-panel>
                 <a-plane position="0 -0.15 -0.01" width="1.1" height="2.2" material="shader:flat; color:#808080"></a-plane>
                 
                 <a-text id="vr-trial-info" value="Trial 1 / X" align="center" width="3" position="0 1.15 0.05" color="#eee"></a-text>
-
                 <a-text id="vr-message" value="" align="center" width="2" position="0 1.0 0.05" color="#FFFF00"
                         font="https://cdn.jsdelivr.net/gh/etiennepinchon/aframe-fonts/fonts/mplus1p/mplus1p-regular.json" shader="msdf"></a-text>
                 
@@ -144,6 +148,10 @@
             "音刺激 単音 C.wav",
             "音刺激 単音 F.wav"
         ];
+        
+        // 練習用音声ファイル (audioフォルダに入れてください)
+        const PRACTICE_AUDIO = "practice.wav";
+
         const DELAY_MS = 3000; 
         // ----------------
 
@@ -153,6 +161,7 @@
         let results = [];
         let startTime = 0;
         let isAudioPlayed = false;
+        let isPracticeMode = false; // 練習モードフラグ
 
         let currentH = 0, currentS = 0, currentV = 100;
 
@@ -162,14 +171,47 @@
         
         document.getElementById('audio-count').innerText = AUDIO_FILES.length + "ファイル";
 
+        // 練習モード開始
+        function startPractice() {
+            participantId = document.getElementById('participant-id').value;
+            conditionId = document.getElementById('condition-select').value;
+            isPracticeMode = true;
+
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('overlay').classList.add('hidden');
+
+            setupConditionView(conditionId);
+            
+            // 練習用の画面セットアップ
+            currentTrialIdx = -1; // 練習を示す
+            isAudioPlayed = false;
+            
+            const infoText = "Practice Mode";
+            document.getElementById('trial-info-2d').innerText = infoText;
+            document.getElementById('instruction-2d').innerText = "音量を調整し、操作を確認してください";
+            
+            const vrTrialEl = document.getElementById('vr-trial-info');
+            if(vrTrialEl) vrTrialEl.setAttribute('value', "Volume Check / Practice");
+
+            // 練習用音声をロード
+            audioPlayer.src = "audio/" + PRACTICE_AUDIO;
+            resetTrialState();
+            
+            showMessage("Adjust Volume & Practice");
+        }
+
+        // 本番開始
         function startExperiment() {
             participantId = document.getElementById('participant-id').value;
             conditionId = document.getElementById('condition-select').value;
+            isPracticeMode = false;
             
             if(!participantId) { alert("参加者IDを入力してください"); return; }
             
             document.getElementById('setup-screen').classList.add('hidden');
             document.getElementById('overlay').classList.add('hidden');
+            
+            document.getElementById('instruction-2d').innerText = "音を聴いて、想起する色を選んでください";
             
             setupConditionView(conditionId);
             loadTrial(0);
@@ -202,10 +244,8 @@
             const trialText = `Trial ${index + 1} / ${AUDIO_FILES.length}`;
             const audioName = AUDIO_FILES[index];
             
-            // 2D用 更新
             document.getElementById('trial-info-2d').innerText = trialText;
             
-            // ★★★ VR用 更新 ★★★
             const vrTrialEl = document.getElementById('vr-trial-info');
             if(vrTrialEl) vrTrialEl.setAttribute('value', trialText);
 
@@ -256,9 +296,7 @@
                     }
                 }
             } else {
-                // 2Dモードでは、Trial表示を一時的にメッセージにするか、consoleのみにする
-                // 画面がごちゃつくのを防ぐため、2Dでは Trial Info をそのままにしておく場合が多いですが、
-                // 必要ならここを書き換えてください。現在はConsoleのみ。
+                // 2Dではコンソールのみ、または必要なら表示
             }
         }
 
@@ -267,6 +305,22 @@
                 showMessage("Please play sound first!");
                 return;
             }
+
+            // ★ 練習モードの場合の処理
+            if (isPracticeMode) {
+                showMessage("Practice Done. Returning...");
+                setTimeout(() => {
+                    // 設定画面に戻る（リロードせずUIを隠す）
+                    ui2d.style.display = 'none';
+                    vrContainer.style.display = 'none';
+                    document.body.style.backgroundColor = "#FFFFFF"; // Setup用に白く戻すなど
+                    document.getElementById('overlay').classList.remove('hidden');
+                    document.getElementById('setup-screen').classList.remove('hidden');
+                }, 1500);
+                return;
+            }
+
+            // 本番データの記録
             const rt = Date.now() - startTime;
             const hsl = hsvToHslCss(currentH, currentS, currentV);
             const record = {
@@ -308,7 +362,6 @@
             currentH = h; currentS = s; currentV = v;
             const cssColor = hsvToHslCss(h, s, v);
 
-            // 2D反映
             if (conditionId === "1") {
                 document.getElementById('preview-2d').style.backgroundColor = cssColor;
             } else if (conditionId === "2") {
@@ -316,7 +369,6 @@
                 document.body.style.backgroundColor = cssColor;
             }
 
-            // VR反映
             if (conditionId === "3" || conditionId === "4") {
                 const vrPreview = document.getElementById('vr-preview');
                 if(vrPreview) vrPreview.setAttribute('material', 'color', cssColor);
@@ -434,5 +486,3 @@
     </script>
 </body>
 </html>
-
-
