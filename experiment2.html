@@ -110,6 +110,8 @@
 
             <a-entity id="control-panel" position="0 1.3 -1.2" rotation="-15 0 0" color-picker-panel>
                 <a-plane position="0 0.1 -0.01" width="1.1" height="1.5" material="shader:flat; color:#333333"></a-plane>
+                <a-text id="vr-message" value="" align="center" width="2" position="0 0.9 0" color="#FFFF00" shader="msdf" font="https://raw.githubusercontent.com/etiennepinchon/aframe-fonts/master/fonts/mplus1p/mplus1p-regular.json"></a-text>
+                <a-plane position="0 0.1 -0.01" width="1.1" height="1.5" material="shader:flat; color:#333333"></a-plane>
 
                 <a-plane position="0 0.6 0" width="0.8" height="0.2" material="shader:flat; color:#000; opacity:0.5" class="clickable" onclick="playCurrentAudio()">
                     <a-text value="Play Sound" align="center" width="4" position="0 0 0.01"></a-text>
@@ -218,12 +220,35 @@
                     startTime = Date.now();
                     isAudioPlayed = true;
                 }
-            }).catch(e => alert("音声再生エラー: audioフォルダを確認してください"));
+            }).catch(e => showMessage("エラー: 音声ファイルが見つかりません"));
         }
+        function showMessage(text) {
+            console.log("Message:", text); // デバッグ用
+
+            if (conditionId === "3" || conditionId === "4") {
+                // VRモードの場合: 空間内のテキストを書き換える
+                const msgEl = document.getElementById('vr-message');
+                if (msgEl) {
+                    msgEl.setAttribute('value', text);
+                    // 3秒後に消す（任意）
+                    setTimeout(() => {
+                        msgEl.setAttribute('value', "");
+                    }, 3000);
+                }
+            } else {
+                // 2Dモードの場合: 普通のアラートを出す（またはHTML要素に表示）
+                // alert(text); // アラートは操作を止めるので、必要ならコメントアウト解除
+                
+                // 代わりに画面上部に出す例（今回は簡易的にコンソールログのみでもOK）
+                const info = document.getElementById('trial-info-2d');
+                if(info) info.innerText = text; // トライアル表示部分を一時的にメッセージにする
+            }
+        }
+        
 
         function confirmColor() {
             if (!isAudioPlayed) {
-                alert("先に音声を再生してください");
+                showMessage("先に音声を再生してください！");
                 return;
             }
             const rt = Date.now() - startTime;
@@ -238,6 +263,7 @@
                 reaction_time_ms: rt,
                 timestamp: new Date().toISOString()
             };
+            showMessage("記録しました！次の音へ");
             results.push(record);
             loadTrial(currentTrialIdx + 1);
         }
