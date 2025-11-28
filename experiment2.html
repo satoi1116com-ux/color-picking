@@ -54,8 +54,8 @@
                 <select id="condition-select">
                     <option value="1">条件1: 2D・ピッカーのみ</option>
                     <option value="2">条件2: 2D・全画面</option>
-                    <option value="3">条件3: VR・ピッカー+床</option>
-                    <option value="4">条件4: VR・空間全体+床</option>
+                    <option value="3">条件3: VR・ピッカーのみ</option>
+                    <option value="4">条件4: VR・空間全体</option>
                 </select>
             </p>
             <p>音声ファイル数: <span id="audio-count">未ロード</span></p>
@@ -164,6 +164,7 @@
         let startTime = 0;
         let isAudioPlayed = false;
         let isPracticeMode = false;
+        let msgTimeout = null; // ★ タイマー管理用変数
 
         let currentH = 0, currentS = 0, currentV = 100;
 
@@ -289,16 +290,18 @@
 
         function showMessage(text) {
             console.log("Message:", text);
+            // ★ 前のタイマーがあればキャンセル（終了メッセージが消えないように）
+            if (msgTimeout) clearTimeout(msgTimeout);
+
             if (conditionId === "3" || conditionId === "4") {
                 const msgEl = document.getElementById('vr-message');
                 if (msgEl) {
                     msgEl.setAttribute('value', text);
-                    if(text !== "Listening...") {
-                        setTimeout(() => { msgEl.setAttribute('value', ""); }, 3000);
+                    if(text !== "Listening..." && text !== "" && text.indexOf("Finished") === -1) {
+                        // "Finished" 以外のメッセージは3秒後に消す
+                        msgTimeout = setTimeout(() => { msgEl.setAttribute('value', ""); }, 3000);
                     }
                 }
-            } else {
-                // 2Dではコンソールのみ
             }
         }
 
@@ -309,7 +312,6 @@
             }
 
             if (isPracticeMode) {
-                console.log("Practice finished. Returning to menu...");
                 showMessage("Practice Done. Returning...");
                 
                 setTimeout(() => {
@@ -359,14 +361,15 @@
         }
 
         function finishExperiment() {
-            // 2D画面の終了処理
             document.getElementById('overlay').classList.remove('hidden');
             document.getElementById('setup-screen').classList.add('hidden');
             document.getElementById('download-screen').classList.remove('hidden');
             
-            // ★★★ VR空間の終了処理 (明確化) ★★★
             const vrContainer = document.getElementById('vr-scene-container');
             if (vrContainer.style.display !== 'none') {
+                // ★ タイマーをキャンセルして確実に表示 ★
+                if (msgTimeout) clearTimeout(msgTimeout);
+                
                 const msgEl = document.getElementById('vr-message');
                 if(msgEl) {
                     msgEl.setAttribute('value', "Experiment Finished\nPlease take off HMD");
@@ -374,15 +377,10 @@
                     msgEl.setAttribute('scale', "1.5 1.5 1.5");
                     msgEl.setAttribute('position', "0 1.6 0.05"); 
                 }
-                
-                // 操作パネルの要素をすべて隠す
                 const vrControls = document.getElementById('controls-vr');
                 if(vrControls) vrControls.setAttribute('visible', false);
-                
-                // 再生ボタンも隠す
                 const btnPlay = document.getElementById('btn-play-vr');
                 if(btnPlay) btnPlay.setAttribute('visible', false);
-                
             } else {
                 vrContainer.style.display = 'none';
             }
@@ -416,29 +414,17 @@
                 const vrPreview = document.getElementById('vr-preview');
                 if(vrPreview) vrPreview.setAttribute('material', 'color', cssColor);
                 
-                // ★★★ 条件3・4共通: 床と背景の反映 ★★★
+                // ★★★ 修正: 条件4のみ床と背景を変える ★★★
                 const sphere = document.getElementById('env-sphere');
                 const grid = document.getElementById('env-grid');
                 
                 if (conditionId === "4") {
-                    // 条件4: 全天球と床の両方が変わる
                     if(sphere) sphere.setAttribute('material', 'color', cssColor);
                     if(grid) grid.setAttribute('material', 'color', cssColor);
                 } else {
-                    // 条件3: 手元のみ（背景と床はグレー固定）
+                    // 条件3: 背景と床はデフォルトに戻す（リセット対応）
                     if(sphere) sphere.setAttribute('material', 'color', '#808080');
                     if(grid) grid.setAttribute('material', 'color', '#404040'); 
-                    // ★ 補足: 条件3でも床を変えたい場合はここを cssColor に書き換えてください
-                    // 今回は「条件3,4ともに床の色を変える」という要望なので、以下に変更します
-                }
-                
-                // ★★★ 修正後ロジック (要望通り: 3と4で床を変える) ★★★
-                if(grid) grid.setAttribute('material', 'color', cssColor);
-                
-                if (conditionId === "4") {
-                    if(sphere) sphere.setAttribute('material', 'color', cssColor);
-                } else {
-                    if(sphere) sphere.setAttribute('material', 'color', '#808080');
                 }
             }
         }
