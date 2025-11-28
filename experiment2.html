@@ -54,8 +54,8 @@
                 <select id="condition-select">
                     <option value="1">条件1: 2D・ピッカーのみ</option>
                     <option value="2">条件2: 2D・全画面</option>
-                    <option value="3">条件3: VR・ピッカーのみ</option>
-                    <option value="4">条件4: VR・空間全体</option>
+                    <option value="3">条件3: VR・ピッカー+床</option>
+                    <option value="4">条件4: VR・空間全体+床</option>
                 </select>
             </p>
             <p>音声ファイル数: <span id="audio-count">未ロード</span></p>
@@ -113,7 +113,7 @@
                 <a-text id="vr-message" value="" align="center" width="2" position="0 1.0 0.05" color="#FFFF00"
                         font="https://cdn.jsdelivr.net/gh/etiennepinchon/aframe-fonts/fonts/mplus1p/mplus1p-regular.json" shader="msdf"></a-text>
                 
-                <a-plane position="0 0.7 0" width="0.8" height="0.2" material="shader:flat; color:#000; opacity:0.5" class="clickable" onclick="playCurrentAudio()">
+                <a-plane id="btn-play-vr" position="0 0.7 0" width="0.8" height="0.2" material="shader:flat; color:#000; opacity:0.5" class="clickable" onclick="playCurrentAudio()">
                     <a-text value="Play Sound" align="center" width="4" position="0 0 0.01"></a-text>
                 </a-plane>
 
@@ -150,12 +150,10 @@
             "音刺激 単音 F.wav"
         ];
         
-        // 練習用音声ファイル (audioフォルダに入れてください)
         const PRACTICE_AUDIO = "practice.wav";
-
         const DELAY_MS = 3000; 
 
-        // GAS URL
+        // GAS URL (ご自身のURLを設定してください)
         const GAS_URL ="https://script.google.com/macros/s/AKfycbwO-b3LMxtAIAf3p-cZbfWNehT56fc5lRnAUJb4dct9eAzdLJWSzXxi20Dgw9YUAEA/exec";
         // ----------------
 
@@ -175,7 +173,6 @@
         
         document.getElementById('audio-count').innerText = AUDIO_FILES.length + "ファイル";
 
-        // 練習モード開始
         function startPractice() {
             participantId = document.getElementById('participant-id').value;
             conditionId = document.getElementById('condition-select').value;
@@ -202,7 +199,6 @@
             showMessage("Adjust Volume & Practice");
         }
 
-        // 本番開始
         function startExperiment() {
             participantId = document.getElementById('participant-id').value;
             conditionId = document.getElementById('condition-select').value;
@@ -232,6 +228,10 @@
                 const sphere = document.getElementById('env-sphere');
                 sphere.setAttribute('visible', true);
                 sphere.setAttribute('material', 'color', '#808080'); 
+                
+                // 床の色を初期化
+                const grid = document.getElementById('env-grid');
+                if(grid) grid.setAttribute('material', 'color', '#404040');
             }
         }
 
@@ -359,10 +359,12 @@
         }
 
         function finishExperiment() {
+            // 2D画面の終了処理
             document.getElementById('overlay').classList.remove('hidden');
             document.getElementById('setup-screen').classList.add('hidden');
             document.getElementById('download-screen').classList.remove('hidden');
             
+            // ★★★ VR空間の終了処理 (明確化) ★★★
             const vrContainer = document.getElementById('vr-scene-container');
             if (vrContainer.style.display !== 'none') {
                 const msgEl = document.getElementById('vr-message');
@@ -372,8 +374,15 @@
                     msgEl.setAttribute('scale', "1.5 1.5 1.5");
                     msgEl.setAttribute('position', "0 1.6 0.05"); 
                 }
+                
+                // 操作パネルの要素をすべて隠す
                 const vrControls = document.getElementById('controls-vr');
                 if(vrControls) vrControls.setAttribute('visible', false);
+                
+                // 再生ボタンも隠す
+                const btnPlay = document.getElementById('btn-play-vr');
+                if(btnPlay) btnPlay.setAttribute('visible', false);
+                
             } else {
                 vrContainer.style.display = 'none';
             }
@@ -407,18 +416,29 @@
                 const vrPreview = document.getElementById('vr-preview');
                 if(vrPreview) vrPreview.setAttribute('material', 'color', cssColor);
                 
-                // ★★★ 修正箇所: 条件4で背景と床の両方を変える ★★★
+                // ★★★ 条件3・4共通: 床と背景の反映 ★★★
+                const sphere = document.getElementById('env-sphere');
+                const grid = document.getElementById('env-grid');
+                
                 if (conditionId === "4") {
-                    const sphere = document.getElementById('env-sphere');
-                    const grid = document.getElementById('env-grid');
+                    // 条件4: 全天球と床の両方が変わる
                     if(sphere) sphere.setAttribute('material', 'color', cssColor);
                     if(grid) grid.setAttribute('material', 'color', cssColor);
                 } else {
-                    // 条件3などはグレー固定（リセット時含む）
-                    const sphere = document.getElementById('env-sphere');
-                    const grid = document.getElementById('env-grid');
+                    // 条件3: 手元のみ（背景と床はグレー固定）
                     if(sphere) sphere.setAttribute('material', 'color', '#808080');
-                    if(grid) grid.setAttribute('material', 'color', '#404040'); // 床のデフォルト色は#404040
+                    if(grid) grid.setAttribute('material', 'color', '#404040'); 
+                    // ★ 補足: 条件3でも床を変えたい場合はここを cssColor に書き換えてください
+                    // 今回は「条件3,4ともに床の色を変える」という要望なので、以下に変更します
+                }
+                
+                // ★★★ 修正後ロジック (要望通り: 3と4で床を変える) ★★★
+                if(grid) grid.setAttribute('material', 'color', cssColor);
+                
+                if (conditionId === "4") {
+                    if(sphere) sphere.setAttribute('material', 'color', cssColor);
+                } else {
+                    if(sphere) sphere.setAttribute('material', 'color', '#808080');
                 }
             }
         }
