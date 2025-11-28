@@ -32,7 +32,7 @@
         
         #overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255,255,255,0.95); z-index: 9999;
+            background: rgba(184, 184, 184, 0.95); z-index: 9999;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
         .hidden { display: none !important; }
@@ -48,7 +48,7 @@
 
     <div id="overlay">
         <div id="setup-screen">
-            <h2>実験2: 設定4</h2>
+            <h2>実験2: 設定</h2>
             <p>参加者ID: <input type="text" id="participant-id" value="test_user"></p>
             <p>実験条件: 
                 <select id="condition-select">
@@ -61,8 +61,8 @@
             <p>音声ファイル数: <span id="audio-count">未ロード</span></p>
             
             <div style="margin-top: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 5px; background: #f9f9f9;">
-                <strong>まずは練習を行ってください</strong><br>
-                <button onclick="startPractice()" style="background-color: #4CAF50; color: white;">練習・音量テストを開始</button>
+                <strong>テストページ</strong><br>
+                <button onclick="startPractice()" style="background-color: #ccc; ">練習・音量テストを開始</button>
             </div>
             <br>
             <button onclick="startExperiment()">本番を開始する</button>
@@ -153,6 +153,9 @@
         const PRACTICE_AUDIO = "practice.wav";
 
         const DELAY_MS = 3000; 
+
+        // GAS URL
+        const GAS_URL ="https://script.google.com/macros/s/AKfycbwO-b3LMxtAIAf3p-cZbfWNehT56fc5lRnAUJb4dct9eAzdLJWSzXxi20Dgw9YUAEA/exec";
         // ----------------
 
         let currentTrialIdx = 0;
@@ -161,7 +164,7 @@
         let results = [];
         let startTime = 0;
         let isAudioPlayed = false;
-        let isPracticeMode = false; // 練習モードフラグ
+        let isPracticeMode = false;
 
         let currentH = 0, currentS = 0, currentV = 100;
 
@@ -183,7 +186,7 @@
             setupConditionView(conditionId);
             
             // 練習用の画面セットアップ
-            currentTrialIdx = -1; // 練習を示す
+            currentTrialIdx = -1;
             isAudioPlayed = false;
             
             const infoText = "Practice Mode";
@@ -306,16 +309,27 @@
                 return;
             }
 
-            // ★ 練習モードの場合の処理
+            // ★ 練習モードの場合の処理 (修正済み)
             if (isPracticeMode) {
+                console.log("Practice finished. Returning to menu...");
                 showMessage("Practice Done. Returning...");
+                
+                // 1.5秒後にメニューに戻す
                 setTimeout(() => {
-                    // 設定画面に戻る（リロードせずUIを隠す）
-                    ui2d.style.display = 'none';
-                    vrContainer.style.display = 'none';
-                    document.body.style.backgroundColor = "#FFFFFF"; // Setup用に白く戻すなど
+                    // UIを隠す
+                    document.getElementById('ui-2d').style.display = 'none';
+                    document.getElementById('vr-scene-container').style.display = 'none';
+                    
+                    // 背景を白に戻す（setup画面用）
+                    document.body.style.backgroundColor = "#FFFFFF"; 
+                    
+                    // オーバーレイ（メニュー）を再表示
                     document.getElementById('overlay').classList.remove('hidden');
                     document.getElementById('setup-screen').classList.remove('hidden');
+                    
+                    // 練習フラグをリセット
+                    isPracticeMode = false;
+                    
                 }, 1500);
                 return;
             }
@@ -333,9 +347,26 @@
                 reaction_time_ms: rt,
                 timestamp: new Date().toISOString()
             };
+            
+            // GASへ送信
+            sendToGoogleSheets(record);
+
             showMessage("Recorded! Next trial...");
             results.push(record);
             loadTrial(currentTrialIdx + 1);
+        }
+
+        function sendToGoogleSheets(data) {
+            fetch(GAS_URL, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "text/plain" },
+                body: JSON.stringify(data)
+            }).then(() => {
+                console.log("Data sent to Google Sheets");
+            }).catch(err => {
+                console.error("Failed to send data:", err);
+            });
         }
 
         function finishExperiment() {
