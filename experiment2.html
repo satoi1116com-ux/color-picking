@@ -403,25 +403,52 @@
             updateButtonState();
         }
 
-        // --- 汎用Canvas描画関数 (テキストとボタン共通) ---
+        // --- 汎用Canvas描画関数 ---
         function drawCanvasText(canvasId, elementId, text, bgColor, textColor, fontSize = 60) {
             const canvas = document.getElementById(canvasId);
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
             
-            // 背景
             ctx.fillStyle = bgColor;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // 文字
             ctx.fillStyle = textColor;
             ctx.font = `bold ${fontSize}px sans-serif`;
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.fillText(text, canvas.width / 2, canvas.height / 2);
 
-            // A-Frameテクスチャ更新通知
             const btnEl = document.getElementById(elementId);
+            if (btnEl) {
+                const mesh = btnEl.getObject3D('mesh');
+                if (mesh && mesh.material && mesh.material.map) {
+                    mesh.material.map.needsUpdate = true;
+                }
+            }
+        }
+        
+        // --- ★新規追加: 説明文専用の描画関数 (2行表示・太字) ---
+        function drawInstructionCanvas() {
+            const canvas = document.getElementById('canvas-inst-vr');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            
+            // 背景（パネルと同色）
+            ctx.fillStyle = "#808080";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 文字設定（太く大きく）
+            ctx.fillStyle = "#FFFFFF";
+            ctx.font = "bold 35px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            
+            // 2行に分けて描画
+            ctx.fillText("音を聴いて、", canvas.width / 2, 40);
+            ctx.fillText("想起する色を選んでください", canvas.width / 2, 90);
+            
+            // 更新通知
+            const btnEl = document.getElementById('inst-plane-vr');
             if (btnEl) {
                 const mesh = btnEl.getObject3D('mesh');
                 if (mesh && mesh.material && mesh.material.map) {
@@ -492,8 +519,8 @@
             drawCanvasButton('canvas-confirm-vr', 'btn-confirm-vr', '決定して次へ', '#E0E0E0', '#333');
             drawCanvasButton('canvas-end-vr', 'btn-end-practice-vr', '練習を終了', '#d32f2f', '#FFF');
             
-            // 説明文の描画 (背景色と文字色を調整)
-            drawCanvasText('canvas-inst-vr', 'inst-plane-vr', '音を聴いて、想起する色を選んでください', '#808080', '#FFFFFF', 26);
+            // 説明文の描画（専用関数を使用）
+            drawInstructionCanvas();
             
             updateButtonState();
         });
@@ -711,7 +738,7 @@
                 }
 
                 // 2. スムージング (線形補間)
-                const factor = 0.1; 
+                const factor = 0.25; 
                 if (Math.abs(this.targetH - this.displayH) > 0.1) this.displayH += (this.targetH - this.displayH) * factor;
                 if (Math.abs(this.targetS - this.displayS) > 0.1) this.displayS += (this.targetS - this.displayS) * factor;
                 if (Math.abs(this.targetV - this.displayV) > 0.1) this.displayV += (this.targetV - this.displayV) * factor;
