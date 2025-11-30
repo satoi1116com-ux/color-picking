@@ -602,7 +602,7 @@
             drawSV();
         }
 
-        AFRAME.registerComponent('color-picker-panel', {
+AFRAME.registerComponent('color-picker-panel', {
             init: function () {
                 this.svPlane = document.querySelector('#sv-plane');
                 this.hPlane = document.querySelector('#h-plane');
@@ -617,28 +617,68 @@
                 this.drawH();
                 this.drawSV(0);
 
-                this.el.sceneEl.addEventListener('click', (evt) => {
-                    const intersect = evt.detail.intersection;
-                    if (!intersect) return;
-                    
-                    if (intersect.object.el === this.svPlane) {
-                        const uv = intersect.uv;
-                        const s = Math.round(uv.x * 100);
-                        const v = Math.round(uv.y * 100);
-                        this.svCursor.setAttribute('position', { x: (uv.x - 0.5) * 0.8, y: (uv.y - 0.5) * 0.8 + 0.15, z: 0.01 });
-                        this.svCursor.setAttribute('visible', true);
-                        updateColor(currentH, s, v);
+                // ドラッグ操作のための状態管理
+                this.draggingTarget = null;
+                this.raycasterEl = document.querySelector('[raycaster]'); // レイキャスターを持つエンティティを取得
 
-                    } else if (intersect.object.el === this.hPlane) {
-                        const uv = intersect.uv;
-                        const h = Math.round(uv.x * 360);
-                        this.hCursor.setAttribute('position', { x: (uv.x - 0.5) * 0.8, y: -0.35, z: 0.01 });
-                        this.hCursor.setAttribute('visible', true);
-                        this.drawSV(h);
-                        updateColor(h, currentS, currentV);
+                // マウスダウン（トリガーを引いた時）
+                const startDrag = (evt) => {
+                    this.draggingTarget = evt.target;
+                    // クリックした瞬間も更新する
+                    if (evt.detail.intersection) {
+                        this.updateFromIntersection(evt.detail.intersection);
                     }
-                });
+                };
+
+                // マウスアップ（トリガーを離した時）
+                const stopDrag = () => {
+                    this.draggingTarget = null;
+                };
+
+                // イベントリスナー登録
+                this.svPlane.addEventListener('mousedown', startDrag);
+                this.hPlane.addEventListener('mousedown', startDrag);
+                
+                // 離す操作は画面全体(シーン)で検知して、ドラッグ外れを防ぐ
+                this.el.sceneEl.addEventListener('mouseup', stopDrag);
             },
+
+            // 毎フレーム実行されるループ
+            tick: function () {
+                // ドラッグ中でなければ何もしない
+                if (!this.draggingTarget || !this.raycasterEl) return;
+
+                // レイキャスターの現在の交差判定を取得
+                const raycaster = this.raycasterEl.components.raycaster;
+                const intersection = raycaster.getIntersection(this.draggingTarget);
+
+                if (intersection) {
+                    this.updateFromIntersection(intersection);
+                }
+            },
+
+            // 交差座標(UV)から色を更新する処理
+            updateFromIntersection: function(intersect) {
+                const uv = intersect.uv;
+                
+                if (intersect.object.el === this.svPlane) {
+                    // SVパネルの操作
+                    const s = Math.round(uv.x * 100);
+                    const v = Math.round(uv.y * 100);
+                    this.svCursor.setAttribute('position', { x: (uv.x - 0.5) * 0.8, y: (uv.y - 0.5) * 0.8 + 0.15, z: 0.01 });
+                    this.svCursor.setAttribute('visible', true);
+                    updateColor(currentH, s, v); // グローバル関数のupdateColorを呼ぶ
+
+                } else if (intersect.object.el === this.hPlane) {
+                    // 色相バーの操作
+                    const h = Math.round(uv.x * 360);
+                    this.hCursor.setAttribute('position', { x: (uv.x - 0.5) * 0.8, y: -0.35, z: 0.01 });
+                    this.hCursor.setAttribute('visible', true);
+                    this.drawSV(h);
+                    updateColor(h, currentS, currentV);
+                }
+            },
+
             drawH: function() {
                 const w = this.hCanvas.width, h = this.hCanvas.height;
                 const g = this.hCtx.createLinearGradient(0,0,w,0);
