@@ -96,6 +96,7 @@
     </div>
 
     <audio id="audio-player"></audio>
+    
     <canvas id="canvas-play-vr" width="512" height="128" style="display:none;"></canvas>
     <canvas id="canvas-confirm-vr" width="512" height="128" style="display:none;"></canvas>
     <canvas id="canvas-end-vr" width="512" height="128" style="display:none;"></canvas>
@@ -156,20 +157,16 @@
                     <a-plane id="vr-preview" position="0 -0.65 0" width="0.8" height="0.2" material="shader:flat; color:#808080; border-color:#eee"></a-plane>
                     <a-plane position="0 -0.65 -0.005" width="0.82" height="0.22" material="shader:flat; color:#ccc"></a-plane>
 
-<a-plane id="btn-confirm-vr" position="0 -0.9 0" width="0.8" height="0.2" 
+                    <a-plane id="btn-confirm-vr" position="0 -0.9 0" width="0.8" height="0.2" 
                              material="shader:flat; src:#canvas-confirm-vr" 
                              class="clickable" onclick="confirmColor()">
                     </a-plane>
+                    
                     <a-plane id="btn-end-practice-vr" position="0 -1.25 0" width="0.8" height="0.2" 
                          material="shader:flat; src:#canvas-end-vr" 
                          class="clickable" visible="false" onclick="endPractice()">
-                </a-plane>
+                    </a-plane>
                 </a-entity>
-
-                <a-plane id="btn-end-practice-vr" position="0 -1.25 0" width="0.8" height="0.2" material="shader:flat; color:#d32f2f" class="clickable" visible="false" onclick="endPractice()">
-                    <a-text value="Finish Practice" align="center" width="4" position="0 0 0.01" color="#FFF"
-                            font="https://cdn.jsdelivr.net/gh/etiennepinchon/aframe-fonts/fonts/mplus1p/mplus1p-regular.json" shader="msdf"></a-text>
-                </a-plane>
             </a-entity>
 
             <a-entity id="player" position="0 0 0">
@@ -178,7 +175,8 @@
             </a-entity>
         </a-scene>
     </div>
-<script>
+
+    <script>
         // --- 設定エリア ---
         const AUDIO_FILES = [
             "音刺激 カデンツ1 ハ長調.mp3",
@@ -189,7 +187,7 @@
         
         const PRACTICE_AUDIO = "practice.wav";
         
-        // GAS URL (既存のまま)
+        // GAS URL
         const GAS_URL ="https://script.google.com/macros/s/AKfycbwO-b3LMxtAIAf3p-cZbfWNehT56fc5lRnAUJb4dct9eAzdLJWSzXxi20Dgw9YUAEA/exec";
         // ----------------
 
@@ -204,16 +202,16 @@
         let audioState = 'initial'; 
         let currentH = 0, currentS = 0, currentV = 100;
 
-        // ★追加: 本番用のプレイリストを格納する配列
         let experimentPlaylist = [];
 
         const ui2d = document.getElementById('ui-2d');
         const vrContainer = document.getElementById('vr-scene-container');
         const audioPlayer = document.getElementById('audio-player');
         
-        // 初期表示は「4種類×2 = 8ファイル」であることを示すため計算して表示
+        // 初期表示
         document.getElementById('audio-count').innerText = (AUDIO_FILES.length * 2) + "ファイル (各2回)";
 
+        // 3秒前判定ロジック
         audioPlayer.addEventListener('timeupdate', function() {
             if (!isAudioPlayed && audioPlayer.duration > 0 && (audioPlayer.duration - audioPlayer.currentTime <= 3.0)) {
                 isAudioPlayed = true;
@@ -275,7 +273,6 @@
             
             if(!participantId) { alert("参加者IDを入力してください"); return; }
             
-            // ★変更点: 音源リストを2倍にし、連続しないようにシャッフルしてプレイリストを作成
             createExperimentPlaylist();
 
             document.getElementById('setup-screen').classList.add('hidden');
@@ -291,17 +288,12 @@
             if(btnEndVr) btnEndVr.setAttribute('visible', false);
         }
 
-        // ★新規追加: プレイリスト作成関数
         function createExperimentPlaylist() {
-            // 1. リストを複製して結合 (例: [A,B,C,D] -> [A,B,C,D,A,B,C,D])
             let list = AUDIO_FILES.concat(AUDIO_FILES);
-            
-            // 2. 連続しない条件を満たすまでシャッフルを繰り返す
             let isValid = false;
             while (!isValid) {
                 shuffleArray(list);
                 isValid = true;
-                // 隣り合う要素が同じかチェック
                 for (let i = 1; i < list.length; i++) {
                     if (list[i] === list[i-1]) {
                         isValid = false;
@@ -339,14 +331,12 @@
         }
 
         function loadTrial(index) {
-            // ★変更点: experimentPlaylist を使用
             if (index >= experimentPlaylist.length) {
                 finishExperiment();
                 return;
             }
             currentTrialIdx = index;
             
-            // 全試行数は experimentPlaylist.length (8回)
             const trialText = `Trial ${index + 1} / ${experimentPlaylist.length}`;
             const audioName = experimentPlaylist[index];
             
@@ -410,59 +400,25 @@
             updateButtonState();
         }
 
-// ▼ ボタンの状態を更新する関数（全面的に書き換え）
-        function updateButtonState() {
-            const btn2d = document.getElementById('btn-play-2d');
-            
-            // 表示したいテキスト（日本語OK）
-            let text = "再生 (Play)";
-            let vrBgColor = "#E0E0E0"; 
-            let vrTextColor = "#333";
-            let cssClass = "";
-
-            if (audioState === 'initial') {
-                text = "再生 (Play)";
-            } else if (audioState === 'ready_to_loop') {
-                text = "ループ開始 (Loop)";
-            } else if (audioState === 'looping') {
-                text = "停止 (Stop)";
-                vrBgColor = "#d32f2f"; // 停止中は赤色に
-                vrTextColor = "#FFF"; 
-                cssClass = "active";
-            }
-
-            // 2Dボタンの更新
-            if(btn2d) {
-                btn2d.innerText = text;
-                btn2d.className = cssClass; 
-            }
-            
-            // VRボタンの更新 (Canvasに日本語を描画)
-            drawVrButton(text, vrBgColor, vrTextColor);
-        }
-
+        // ▼ 汎用Canvasボタン描画関数
         function drawCanvasButton(canvasId, elementId, text, bgColor, textColor) {
             const canvas = document.getElementById(canvasId);
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
             
-            // 背景
             ctx.fillStyle = bgColor;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // 枠線
             ctx.strokeStyle = textColor;
             ctx.lineWidth = 10;
             ctx.strokeRect(0, 0, canvas.width, canvas.height);
 
-            // 文字
             ctx.fillStyle = textColor;
             ctx.font = "bold 60px sans-serif"; 
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.fillText(text, canvas.width / 2, canvas.height / 2);
 
-            // テクスチャ更新通知
             const btnEl = document.getElementById(elementId);
             if (btnEl) {
                 const mesh = btnEl.getObject3D('mesh');
@@ -472,7 +428,7 @@
             }
         }
 
-        // ▼ ボタン状態更新 (再生ボタン用)
+        // ▼ ボタン状態更新 (統合版)
         function updateButtonState() {
             const btn2d = document.getElementById('btn-play-2d');
             
@@ -497,53 +453,16 @@
                 btn2d.className = cssClass; 
             }
             
-            // 再生ボタンを描画
+            // 再生ボタンをCanvasで描画
             drawCanvasButton('canvas-play-vr', 'btn-play-vr', text, vrBgColor, vrTextColor);
         }
 
-        // ▼ 初期化時に固定ボタン（決定・練習終了）の文字を描画する
+        // ▼ 初期化時に固定ボタンの文字を描画
         window.addEventListener('load', function() {
-            // 決定ボタン
             drawCanvasButton('canvas-confirm-vr', 'btn-confirm-vr', '決定して次へ', '#E0E0E0', '#333');
-            
-            // 練習終了ボタン
             drawCanvasButton('canvas-end-vr', 'btn-end-practice-vr', '練習を終了', '#d32f2f', '#FFF');
-            
-            // 再生ボタンも初期状態で描画しておく
             updateButtonState();
         });
-        
-        // ▼ 追加: VRボタン用キャンバス描画関数
-        function drawVrButton(text, bgColor, textColor) {
-            const canvas = document.getElementById('canvas-play-vr');
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d');
-            
-            // 背景を塗る
-            ctx.fillStyle = bgColor;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // 枠線を描く
-            ctx.strokeStyle = textColor;
-            ctx.lineWidth = 10;
-            ctx.strokeRect(0, 0, canvas.width, canvas.height);
-
-            // 文字を描く（日本語フォント指定）
-            ctx.fillStyle = textColor;
-            ctx.font = "bold 60px sans-serif"; 
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-
-            // A-Frameに「テクスチャが更新された」と通知
-            const btnEl = document.getElementById('btn-play-vr');
-            if (btnEl) {
-                const mesh = btnEl.getObject3D('mesh');
-                if (mesh && mesh.material && mesh.material.map) {
-                    mesh.material.map.needsUpdate = true;
-                }
-            }
-        }
 
         function showMessage(text) {
             console.log("Message:", text);
@@ -577,12 +496,11 @@
             const rt = Date.now() - startTime;
             const hsl = hsvToHslCss(currentH, currentS, currentV);
             
-            // ★変更点: experimentPlaylist を使用
             const record = {
                 participant_id: participantId,
                 condition: conditionId,
                 trial_number: currentTrialIdx + 1,
-                audio_file: experimentPlaylist[currentTrialIdx], // ここを変更
+                audio_file: experimentPlaylist[currentTrialIdx], 
                 h: currentH, s: currentS, v: currentV,
                 hsl_css: hsl,
                 reaction_time_ms: rt,
@@ -712,7 +630,7 @@
             drawSV();
         }
 
-AFRAME.registerComponent('color-picker-panel', {
+        AFRAME.registerComponent('color-picker-panel', {
             init: function () {
                 this.svPlane = document.querySelector('#sv-plane');
                 this.hPlane = document.querySelector('#h-plane');
@@ -727,60 +645,45 @@ AFRAME.registerComponent('color-picker-panel', {
                 this.drawH();
                 this.drawSV(0);
 
-                // ドラッグ操作のための状態管理
                 this.draggingTarget = null;
-                this.raycasterEl = document.querySelector('[raycaster]'); // レイキャスターを持つエンティティを取得
+                this.raycasterEl = document.querySelector('[raycaster]'); 
 
-                // マウスダウン（トリガーを引いた時）
                 const startDrag = (evt) => {
                     this.draggingTarget = evt.target;
-                    // クリックした瞬間も更新する
                     if (evt.detail.intersection) {
                         this.updateFromIntersection(evt.detail.intersection);
                     }
                 };
 
-                // マウスアップ（トリガーを離した時）
                 const stopDrag = () => {
                     this.draggingTarget = null;
                 };
 
-                // イベントリスナー登録
                 this.svPlane.addEventListener('mousedown', startDrag);
                 this.hPlane.addEventListener('mousedown', startDrag);
-                
-                // 離す操作は画面全体(シーン)で検知して、ドラッグ外れを防ぐ
                 this.el.sceneEl.addEventListener('mouseup', stopDrag);
             },
 
-            // 毎フレーム実行されるループ
             tick: function () {
-                // ドラッグ中でなければ何もしない
                 if (!this.draggingTarget || !this.raycasterEl) return;
-
-                // レイキャスターの現在の交差判定を取得
                 const raycaster = this.raycasterEl.components.raycaster;
                 const intersection = raycaster.getIntersection(this.draggingTarget);
-
                 if (intersection) {
                     this.updateFromIntersection(intersection);
                 }
             },
 
-            // 交差座標(UV)から色を更新する処理
             updateFromIntersection: function(intersect) {
                 const uv = intersect.uv;
                 
                 if (intersect.object.el === this.svPlane) {
-                    // SVパネルの操作
                     const s = Math.round(uv.x * 100);
                     const v = Math.round(uv.y * 100);
                     this.svCursor.setAttribute('position', { x: (uv.x - 0.5) * 0.8, y: (uv.y - 0.5) * 0.8 + 0.15, z: 0.01 });
                     this.svCursor.setAttribute('visible', true);
-                    updateColor(currentH, s, v); // グローバル関数のupdateColorを呼ぶ
+                    updateColor(currentH, s, v); 
 
                 } else if (intersect.object.el === this.hPlane) {
-                    // 色相バーの操作
                     const h = Math.round(uv.x * 360);
                     this.hCursor.setAttribute('position', { x: (uv.x - 0.5) * 0.8, y: -0.35, z: 0.01 });
                     this.hCursor.setAttribute('visible', true);
