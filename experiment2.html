@@ -8,13 +8,13 @@
     <style>
         body { font-family: sans-serif; margin: 0; overflow: hidden; transition: background-color 0.1s; }
         
-        /* --- 条件1, 2用 UI (ex27.htmlのデザインを復元) --- */
+        /* 2D用UI (ex27.htmlのデザイン) */
         #ui-2d {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             background: #808080; color: #eee;
             padding: 20px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
             z-index: 100; display: none; text-align: center;
-            min-width: 320px;
+            min-width: 350px;
         }
         
         /* 色相スライダー */
@@ -31,21 +31,19 @@
             cursor: pointer; box-shadow: 0 0 2px rgba(0,0,0,0.5);
         }
         
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; margin-top: 10px; border-radius: 4px; border: 1px solid #999; }
-        button:hover { background-color: #ddd; }
-        button.active { background-color: #404040; color: #fff; }
-
-        canvas { border: 1px solid #ccc; cursor: crosshair; margin-bottom: 10px; }
-        input, select { padding: 8px; font-size: 16px; margin: 5px; }
-
-        /* オーバーレイ */
         #overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(128, 128, 128, 0.95); z-index: 9999;
-            display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: #fff;
         }
-        #setup-screen { background: #666; padding: 30px; border-radius: 10px; text-align: center; }
+        #setup-screen { background: #666; padding: 30px; border-radius: 10px; }
         .hidden { display: none !important; }
+        
+        canvas { border: 1px solid #ccc; cursor: crosshair; margin-bottom: 10px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; margin-top: 10px; border-radius: 4px; border: 1px solid #999; }
+        button:hover { background-color: #ddd; }
+        input, select { padding: 8px; font-size: 16px; margin: 5px; }
         
         #vr-scene-container { width: 100vw; height: 100vh; display: none; }
     </style>
@@ -53,7 +51,7 @@
 <body>
 
     <div id="overlay">
-        <div id="setup-screen">
+        <div id="setup-screen" style="text-align:center;">
             <h2>実験2: 設定</h2>
             <p>参加者ID: <input type="text" id="participant-id" value="test_user" style="color:#000;"></p>
             <p>実験条件: 
@@ -74,7 +72,7 @@
             <button onclick="startExperiment()">本番を開始する</button>
         </div>
 
-        <div id="download-screen" class="hidden" style="background:#666; padding:30px; border-radius:10px; text-align:center;">
+        <div id="download-screen" class="hidden" style="text-align:center; background:#666; padding:30px; border-radius:10px;">
             <h2>実験終了</h2>
             <p>お疲れ様でした。データを保存してください。</p>
             <button onclick="downloadCSV()">結果をダウンロード (CSV)</button>
@@ -91,12 +89,12 @@
     <canvas id="canvas-confirm-vr" width="512" height="128" style="display:none;"></canvas>
 
     <div id="ui-2d">
-        <h3 id="trial-info-2d">Trial 1</h3>
+        <h3 id="trial-info-2d" style="margin-top:0;">Trial 1</h3>
         <p id="instruction-2d">音を聴いて、想起する色を選んでください</p>
         
         <button onclick="handlePlayButton()" id="btn-play-2d">再生 (Play)</button>
         
-        <div id="controls-2d" style="margin-top:15px; display:none;">
+        <div id="controls-2d" style="margin-top:20px; display:none;">
             <canvas id="sv-canvas-2d" width="300" height="200"></canvas><br>
             <input type="range" id="h-slider-2d" min="0" max="360" value="0" style="width:300px;">
             
@@ -107,7 +105,7 @@
             
             <button onclick="confirmColor()">決定して次へ</button>
         </div>
-        
+
         <button id="btn-end-practice-2d" onclick="endPractice()" style="display:none; background-color:#d32f2f; color:white; margin-top:20px;">練習を終了して戻る</button>
     </div>
 
@@ -201,7 +199,6 @@
         
         document.getElementById('audio-count').innerText = (AUDIO_FILES.length * 2) + "ファイル (各2回)";
 
-        // 3秒前判定ロジック (最近の修正を維持)
         audioPlayer.addEventListener('timeupdate', function() {
             if (!isAudioPlayed && audioPlayer.duration > 0 && (audioPlayer.duration - audioPlayer.currentTime <= 3.0)) {
                 isAudioPlayed = true;
@@ -303,8 +300,7 @@
             
             if (cond === "1" || cond === "2") {
                 ui2d.style.display = 'block';
-                // 2D初期化：ここで確実に実行
-                setTimeout(init2DCanvas, 100); 
+                init2DCanvas(); // 初期化呼び出し
             } else {
                 vrContainer.style.display = 'block';
                 const sphere = document.getElementById('env-sphere');
@@ -343,7 +339,6 @@
             isAudioPlayed = false;
             audioState = 'initial'; 
             
-            // 色リセット
             updateColor(currentH, currentS, currentV);
             updateButtonState(); 
 
@@ -354,10 +349,14 @@
             const slider = document.getElementById('h-slider-2d');
             if(slider) slider.value = 0;
             
-            // 2Dカーソル位置リセット (再描画)
+            // 2D用リセット (描画のみ)
             if (conditionId === "1" || conditionId === "2") {
-                // 少し待ってから描画することでDOM反映を確実にする
-                setTimeout(draw2DVisuals, 50);
+                const canvas = document.getElementById('sv-canvas-2d');
+                if (canvas.getAttribute('data-init') === 'true') {
+                    // 背景を初期化（ただしイベントは再登録しない）
+                    // 簡易的にinit2DCanvasを呼べばdrawSVが実行される
+                    init2DCanvas();
+                }
             }
         }
 
@@ -395,7 +394,7 @@
             updateButtonState();
         }
 
-        // --- 共通描画関数群 ---
+        // --- 描画関数 ---
         function drawCanvasText(canvasId, elementId, text, bgColor, textColor, fontSize = 60) {
             const canvas = document.getElementById(canvasId);
             if (!canvas) return;
@@ -566,7 +565,7 @@
             currentH = h; currentS = s; currentV = v;
             const cssColor = hsvToHslCss(h, s, v);
 
-            // 2Dプレビュー更新 (ここを確実に実行)
+            // 2Dプレビュー更新 (ここを修正して確実に反映)
             if (conditionId === "1" || conditionId === "2") {
                 const preview = document.getElementById('preview-2d');
                 if(preview) preview.style.backgroundColor = cssColor;
@@ -601,71 +600,57 @@
             return `hsl(${h}, ${Math.round(s_hsl * 100)}%, ${Math.round(l * 100)}%)`;
         }
 
-        // --- 2D描画関連の修正版 (円を描く機能を追加！) ---
-        
-        function draw2DVisuals() {
-            const canvas = document.getElementById('sv-canvas-2d');
-            const slider = document.getElementById('h-slider-2d');
-            if(!canvas || !slider) return;
-
-            const ctx = canvas.getContext('2d');
-            const w = canvas.width, h = canvas.height;
-
-            // 1. 背景描画 (色相ベース)
-            ctx.fillStyle = `hsl(${slider.value}, 100%, 50%)`; 
-            ctx.fillRect(0,0,w,h);
-            
-            // 2. グラデーション (SとV)
-            const wg = ctx.createLinearGradient(0,0,w,0);
-            wg.addColorStop(0,'white'); wg.addColorStop(1,'rgba(255,255,255,0)');
-            ctx.fillStyle = wg; ctx.fillRect(0,0,w,h);
-            const bg = ctx.createLinearGradient(0,0,0,h);
-            bg.addColorStop(0,'rgba(0,0,0,0)'); bg.addColorStop(1,'black');
-            ctx.fillStyle = bg; ctx.fillRect(0,0,w,h);
-
-            // 3. カーソルの描画 (ここが重要！)
-            const cursorX = (currentS / 100) * w;
-            const cursorY = (1 - currentV / 100) * h;
-            
-            ctx.beginPath();
-            ctx.arc(cursorX, cursorY, 8, 0, Math.PI * 2);
-            ctx.strokeStyle = "white"; ctx.lineWidth = 3; ctx.stroke();
-            
-            ctx.beginPath();
-            ctx.arc(cursorX, cursorY, 8, 0, Math.PI * 2);
-            ctx.strokeStyle = "black"; ctx.lineWidth = 1; ctx.stroke();
-        }
-
+        // --- 2D描画関連の修正版 (ポインター無し、プレビュー反映重視) ---
         function init2DCanvas() {
             const canvas = document.getElementById('sv-canvas-2d');
             const slider = document.getElementById('h-slider-2d');
+            const ctx = canvas.getContext('2d');
             
             // 重複リスナー登録防止
             if (canvas.getAttribute('data-init') === 'true') {
-                draw2DVisuals(); 
+                drawSV(); // 再描画のみ
                 return;
             }
             canvas.setAttribute('data-init', 'true');
 
-            // スライダー操作時: ログ記録＋再描画
+            // 描画関数 (ポインター無し)
+            function drawSV() {
+                const w = canvas.width, h = canvas.height;
+                // 色相を変えたときに背景を更新
+                ctx.fillStyle = `hsl(${slider.value}, 100%, 50%)`; 
+                ctx.fillRect(0,0,w,h);
+                // グラデーション
+                const wg = ctx.createLinearGradient(0,0,w,0);
+                wg.addColorStop(0,'white'); wg.addColorStop(1,'rgba(255,255,255,0)');
+                ctx.fillStyle = wg; ctx.fillRect(0,0,w,h);
+                const bg = ctx.createLinearGradient(0,0,0,h);
+                bg.addColorStop(0,'rgba(0,0,0,0)'); bg.addColorStop(1,'black');
+                ctx.fillStyle = bg; ctx.fillRect(0,0,w,h);
+            }
+
+            // スライダー操作時
+            // ★重要: drawSV()だけ呼び、currentS/currentVは変更しない
             slider.addEventListener('input', () => { 
                 if(isAudioPlayed) operationCount++;
-                updateColor(slider.value, currentS, currentV);
-                draw2DVisuals(); 
+                currentH = parseInt(slider.value); // Hだけ更新
+                updateColor(currentH, currentS, currentV); // プレビュー反映
+                drawSV(); // 背景更新
             });
 
-            // SVキャンバス操作時
+            // キャンバス操作時
             let dragging = false;
             const pick = (e) => {
                 const rect = canvas.getBoundingClientRect();
                 const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
                 const y = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
+                
+                // ここでSとVを更新
                 const s = Math.round((x / rect.width) * 100);
                 const v = Math.round((1 - y / rect.height) * 100);
                 
                 if(isAudioPlayed) operationCount++;
-                updateColor(slider.value, s, v);
-                draw2DVisuals(); 
+                updateColor(slider.value, s, v); // プレビュー反映
+                // drawSV(); // ポインターを描かないので再描画不要
             };
             
             canvas.addEventListener('mousedown', (e) => { dragging = true; pick(e); });
@@ -673,7 +658,7 @@
             window.addEventListener('mouseup', () => dragging = false);
             
             // 初回描画
-            draw2DVisuals();
+            drawSV();
         }
 
         // ▼ VR用 (スムージング + ポインター補正)
