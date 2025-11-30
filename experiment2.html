@@ -97,7 +97,9 @@
 
     <audio id="audio-player"></audio>
     <canvas id="canvas-play-vr" width="512" height="128" style="display:none;"></canvas>
-    
+    <canvas id="canvas-confirm-vr" width="512" height="128" style="display:none;"></canvas>
+    <canvas id="canvas-end-vr" width="512" height="128" style="display:none;"></canvas>
+
     <div id="ui-2d">
         <h3 id="trial-info-2d" style="margin-top:0;">Trial 1</h3>
         <p id="instruction-2d">音を聴いて、想起する色を選んでください</p>
@@ -154,10 +156,14 @@
                     <a-plane id="vr-preview" position="0 -0.65 0" width="0.8" height="0.2" material="shader:flat; color:#808080; border-color:#eee"></a-plane>
                     <a-plane position="0 -0.65 -0.005" width="0.82" height="0.22" material="shader:flat; color:#ccc"></a-plane>
 
-                    <a-plane position="0 -0.9 0" width="0.8" height="0.2" material="shader:flat; color:#E0E0E0" class="clickable" onclick="confirmColor()">
-                        <a-text value="CONFIRM / NEXT" align="center" width="4" position="0 0 0.01" color="#333"
-                                font="https://cdn.jsdelivr.net/gh/etiennepinchon/aframe-fonts/fonts/mplus1p/mplus1p-regular.json" shader="msdf"></a-text>
+<a-plane id="btn-confirm-vr" position="0 -0.9 0" width="0.8" height="0.2" 
+                             material="shader:flat; src:#canvas-confirm-vr" 
+                             class="clickable" onclick="confirmColor()">
                     </a-plane>
+                    <a-plane id="btn-end-practice-vr" position="0 -1.25 0" width="0.8" height="0.2" 
+                         material="shader:flat; src:#canvas-end-vr" 
+                         class="clickable" visible="false" onclick="endPractice()">
+                </a-plane>
                 </a-entity>
 
                 <a-plane id="btn-end-practice-vr" position="0 -1.25 0" width="0.8" height="0.2" material="shader:flat; color:#d32f2f" class="clickable" visible="false" onclick="endPractice()">
@@ -435,6 +441,78 @@
             drawVrButton(text, vrBgColor, vrTextColor);
         }
 
+        function drawCanvasButton(canvasId, elementId, text, bgColor, textColor) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            
+            // 背景
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 枠線
+            ctx.strokeStyle = textColor;
+            ctx.lineWidth = 10;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+            // 文字
+            ctx.fillStyle = textColor;
+            ctx.font = "bold 60px sans-serif"; 
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+            // テクスチャ更新通知
+            const btnEl = document.getElementById(elementId);
+            if (btnEl) {
+                const mesh = btnEl.getObject3D('mesh');
+                if (mesh && mesh.material && mesh.material.map) {
+                    mesh.material.map.needsUpdate = true;
+                }
+            }
+        }
+
+        // ▼ ボタン状態更新 (再生ボタン用)
+        function updateButtonState() {
+            const btn2d = document.getElementById('btn-play-2d');
+            
+            let text = "再生 (Play)";
+            let vrBgColor = "#E0E0E0"; 
+            let vrTextColor = "#333";
+            let cssClass = "";
+
+            if (audioState === 'initial') {
+                text = "再生 (Play)";
+            } else if (audioState === 'ready_to_loop') {
+                text = "ループ開始 (Loop)";
+            } else if (audioState === 'looping') {
+                text = "停止 (Stop)";
+                vrBgColor = "#d32f2f"; 
+                vrTextColor = "#FFF"; 
+                cssClass = "active";
+            }
+
+            if(btn2d) {
+                btn2d.innerText = text;
+                btn2d.className = cssClass; 
+            }
+            
+            // 再生ボタンを描画
+            drawCanvasButton('canvas-play-vr', 'btn-play-vr', text, vrBgColor, vrTextColor);
+        }
+
+        // ▼ 初期化時に固定ボタン（決定・練習終了）の文字を描画する
+        window.addEventListener('load', function() {
+            // 決定ボタン
+            drawCanvasButton('canvas-confirm-vr', 'btn-confirm-vr', '決定して次へ', '#E0E0E0', '#333');
+            
+            // 練習終了ボタン
+            drawCanvasButton('canvas-end-vr', 'btn-end-practice-vr', '練習を終了', '#d32f2f', '#FFF');
+            
+            // 再生ボタンも初期状態で描画しておく
+            updateButtonState();
+        });
+        
         // ▼ 追加: VRボタン用キャンバス描画関数
         function drawVrButton(text, bgColor, textColor) {
             const canvas = document.getElementById('canvas-play-vr');
