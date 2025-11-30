@@ -403,33 +403,43 @@
             updateButtonState();
         }
 
-        function updateButtonState() {
+function updateButtonState() {
             const btn2d = document.getElementById('btn-play-2d');
             const txtVr = document.getElementById('txt-play-vr');
             const bgVr = document.getElementById('btn-play-vr');
 
-            let text = "再生 (Play)";
+            // 2D画面用（日本語OK）とVR用（英語推奨）で変数を分ける
+            let text2d = "再生 (Play)";
+            let textVr = "Play";
+            
             let vrColor = "#E0E0E0"; 
             let vrTextColor = "#333";
             let cssClass = "";
 
             if (audioState === 'initial') {
-                text = "再生 (Play)";
+                text2d = "再生 (Play)";
+                textVr = "Play";
             } else if (audioState === 'ready_to_loop') {
-                text = "ループ開始 (Loop)";
+                text2d = "ループ開始 (Loop)";
+                textVr = "Loop";
             } else if (audioState === 'looping') {
-                text = "停止 (Stop)";
+                text2d = "停止 (Stop)";
+                textVr = "Stop";
+                
                 vrColor = "#404040"; 
                 vrTextColor = "#FFF"; 
                 cssClass = "active";
             }
 
+            // 2Dボタンの更新
             if(btn2d) {
-                btn2d.innerText = text;
+                btn2d.innerText = text2d;
                 btn2d.className = cssClass; 
             }
+            
+            // VRボタンの更新（英語を使用）
             if(txtVr && bgVr) {
-                txtVr.setAttribute('value', text);
+                txtVr.setAttribute('value', textVr);
                 txtVr.setAttribute('color', vrTextColor);
                 bgVr.setAttribute('material', 'color', vrColor);
             }
