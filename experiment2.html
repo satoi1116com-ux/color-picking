@@ -300,7 +300,8 @@
             
             if (cond === "1" || cond === "2") {
                 ui2d.style.display = 'block';
-                init2DCanvas(); // 初期化呼び出し
+                // 2D初期化：DOM表示後に確実に実行
+                setTimeout(init2DCanvas, 100); 
             } else {
                 vrContainer.style.display = 'block';
                 const sphere = document.getElementById('env-sphere');
@@ -351,12 +352,7 @@
             
             // 2D用リセット (描画のみ)
             if (conditionId === "1" || conditionId === "2") {
-                const canvas = document.getElementById('sv-canvas-2d');
-                if (canvas.getAttribute('data-init') === 'true') {
-                    // 背景を初期化（ただしイベントは再登録しない）
-                    // 簡易的にinit2DCanvasを呼べばdrawSVが実行される
-                    init2DCanvas();
-                }
+                setTimeout(init2DCanvas, 50);
             }
         }
 
@@ -394,7 +390,7 @@
             updateButtonState();
         }
 
-        // --- 描画関数 ---
+        // --- 共通描画関数群 ---
         function drawCanvasText(canvasId, elementId, text, bgColor, textColor, fontSize = 60) {
             const canvas = document.getElementById(canvasId);
             if (!canvas) return;
