@@ -94,6 +94,7 @@
 
     <audio id="audio-player"></audio>
     
+    <!-- ▼ VR内テキスト・ボタン描画用のCanvas群 -->
     <canvas id="canvas-trial-vr" width="512" height="128" style="display:none;"></canvas>
     <canvas id="canvas-inst-vr" width="512" height="128" style="display:none;"></canvas>
     <canvas id="canvas-play-vr" width="512" height="128" style="display:none;"></canvas>
@@ -121,6 +122,7 @@
     </div>
 
     <div id="vr-scene-container">
+        <!-- 色選択パネル用テクスチャCanvas -->
         <canvas id="sv-canvas-vr" width="256" height="256" style="display:none;"></canvas>
         <canvas id="h-canvas-vr" width="256" height="64" style="display:none;"></canvas>
 
@@ -128,29 +130,38 @@
             <a-sphere id="env-sphere" radius="50" material="shader:flat; color:#808080; side:back" visible="false"></a-sphere>
             <a-grid id="env-grid" width="20" height="20" divisions="20" material="shader:flat; color:#404040" position="0 0.01 0"></a-grid>
 
+            <!-- コントロールパネル (距離 -2.5m) -->
             <a-entity id="control-panel" position="0 1.3 -2.5" rotation="-15 0 0" color-picker-panel>
+                <!-- 背景パネル -->
                 <a-plane position="0 0.05 -0.01" width="1.2" height="2.9" material="shader:flat; color:#808080"></a-plane>
                 
+                <!-- 1. トライアル情報 -->
                 <a-plane id="info-plane-vr" position="0 1.25 0" width="1.0" height="0.2" 
                          material="shader:flat; src:#canvas-trial-vr; transparent:true">
                 </a-plane>
                 
+                <!-- システムメッセージ -->
                 <a-text id="vr-message" value="" align="center" width="2" position="0 1.05 0.05" color="#FFFF00"
                         font="https://cdn.jsdelivr.net/gh/etiennepinchon/aframe-fonts/fonts/mplus1p/mplus1p-regular.json" shader="msdf"></a-text>
                 
+                <!-- 2. 再生ボタン -->
                 <a-plane id="btn-play-vr" position="0 0.85 0" width="0.8" height="0.2" 
                          material="shader:flat; src:#canvas-play-vr" 
                          class="clickable" onclick="handlePlayButton()">
                 </a-plane>
 
+                <!-- 3. 説明文 -->
                 <a-plane id="inst-plane-vr" position="0 0.6 0" width="1.0" height="0.2" 
                          material="shader:flat; src:#canvas-inst-vr; transparent:true">
                 </a-plane>
 
+                <!-- 4. 色操作パネル群 -->
                 <a-entity id="controls-vr" visible="false">
+                    <!-- 彩度・明度 (Y座標: 0.05) -->
                     <a-plane id="sv-plane" class="clickable" position="0 0.05 0" width="0.8" height="0.8" material="shader:flat; src:#sv-canvas-vr"></a-plane>
                     <a-sphere id="sv-cursor" position="0 0.05 0.01" radius="0.02" material="shader:flat; color:#FFF" visible="false"></a-sphere>
 
+                    <!-- 色相バー -->
                     <a-plane id="h-plane" class="clickable" position="0 -0.45 0" width="0.8" height="0.15" material="shader:flat; src:#h-canvas-vr"></a-plane>
                     <a-plane id="h-cursor" position="0 -0.45 0.01" width="0.02" height="0.17" material="shader:flat; color:#FFF; opacity:0.8" visible="false"></a-plane>
 
@@ -160,6 +171,7 @@
                     <a-plane id="vr-preview" position="0 -0.75 0" width="0.8" height="0.2" material="shader:flat; color:#808080; border-color:#eee"></a-plane>
                     <a-plane position="0 -0.75 -0.005" width="0.82" height="0.22" material="shader:flat; color:#ccc"></a-plane>
 
+                    <!-- 決定ボタン -->
                     <a-plane id="btn-confirm-vr" position="0 -1.0 0" width="0.8" height="0.2" 
                              material="shader:flat; src:#canvas-confirm-vr" 
                              class="clickable" onclick="confirmColor()">
@@ -197,6 +209,9 @@
         let msgTimeout = null;
         let audioState = 'initial'; 
         let currentH = 0, currentS = 0, currentV = 50; // 初期色: グレー
+
+        // ★追加: ループ再生を使用したかどうかのフラグ
+        let isLooped = false;
 
         let experimentPlaylist = [];
 
@@ -346,6 +361,7 @@
             currentH = 0; currentS = 0; currentV = 50;
             isAudioPlayed = false;
             audioState = 'initial'; 
+            isLooped = false; // ★リセット
             
             updateColor(currentH, currentS, currentV);
             updateButtonState(); 
@@ -378,6 +394,7 @@
         }
 
         function startLooping() {
+            isLooped = true; // ★ループ開始を記録
             audioPlayer.loop = true;
             audioPlayer.currentTime = 0; 
             audioPlayer.play();
@@ -497,6 +514,7 @@
             const rt = Date.now() - startTime;
             const hsl = hsvToHslCss(currentH, currentS, currentV);
             
+            // ★送信データ: is_looped を追加
             const record = {
                 participant_id: participantId,
                 condition: conditionId,
@@ -505,6 +523,7 @@
                 h: currentH, s: currentS, v: currentV,
                 hsl_css: hsl,
                 reaction_time_ms: rt,
+                is_looped: isLooped, // ★追加
                 timestamp: new Date().toISOString()
             };
             
@@ -621,7 +640,7 @@
             drawSV();
         }
 
-        // ▼ 修正版: ポインターのズレ解消 (Y+0.05) + スムージング
+        // ▼ ポインターのズレ解消 (Y+0.05) + スムージング
         AFRAME.registerComponent('color-picker-panel', {
             init: function () {
                 this.svPlane = document.querySelector('#sv-plane');
@@ -694,7 +713,7 @@
                 }
             },
 
-            // ★修正箇所: SVカーソルのY座標計算 (0.05)
+            // SVカーソルのY座標計算 (0.05)
             updateCursorVisuals: function(h, s, v) {
                 const x_sv = (s / 100 - 0.5) * 0.8;
                 const y_sv = (v / 100 - 0.5) * 0.8 + 0.05; 
