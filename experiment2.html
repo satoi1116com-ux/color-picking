@@ -28,11 +28,22 @@
             margin-top: 15px;
             width: 100%;
             transition: background-color 0.2s, color 0.2s;
+            
+            /* 通常時: 明るいグレー (白に近い) */
             background-color: #E0E0E0;
             color: #333;
         }
-        button:hover { background-color: #fff; }
-        button.active { background-color: #404040; color: #fff; border: 1px solid #000; }
+        
+        button:hover {
+            background-color: #fff;
+        }
+
+        /* アクティブ状態（ループ中など）: 濃いグレー */
+        button.active {
+            background-color: #404040;
+            color: #fff;
+            border: 1px solid #000;
+        }
         
         /* スライダー */
         #h-slider-2d {
@@ -50,11 +61,13 @@
         
         #overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: #808080; z-index: 9999;
+            background: #808080; z-index: 9999; /* 背景もグレーに統一 */
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             color: #fff;
         }
-        #setup-screen { background: #666; padding: 30px; border-radius: 10px; color: #fff; }
+        #setup-screen {
+            background: #666; padding: 30px; border-radius: 10px; color: #fff;
+        }
         .hidden { display: none !important; }
         
         canvas { border: 2px solid #ccc; cursor: crosshair; margin-bottom: 10px; border-radius: 4px; }
@@ -123,20 +136,18 @@
 
         <a-scene id="aframe-scene" embedded>
             <a-sphere id="env-sphere" radius="50" material="shader:flat; color:#808080; side:back" visible="false"></a-sphere>
+            
             <a-grid id="env-grid" width="20" height="20" divisions="20" material="shader:flat; color:#404040" position="0 0.01 0"></a-grid>
 
             <a-entity id="control-panel" position="0 1.3 -1.5" rotation="-15 0 0" color-picker-panel>
                 <a-plane position="0 -0.15 -0.01" width="1.1" height="2.2" material="shader:flat; color:#808080"></a-plane>
                 
-                <a-text id="vr-trial-info" value="Trial 1 / X" align="center" width="3" position="0 1.15 0.05" color="#eee"
-                        font="https://cdn.jsdelivr.net/gh/etiennepinchon/aframe-fonts/fonts/mplus1p/mplus1p-regular.json" shader="msdf"></a-text>
-                
+                <a-text id="vr-trial-info" value="Trial 1 / X" align="center" width="3" position="0 1.15 0.05" color="#eee"></a-text>
                 <a-text id="vr-message" value="" align="center" width="2" position="0 1.0 0.05" color="#FFFF00"
                         font="https://cdn.jsdelivr.net/gh/etiennepinchon/aframe-fonts/fonts/mplus1p/mplus1p-regular.json" shader="msdf"></a-text>
                 
                 <a-plane id="btn-play-vr" position="0 0.7 0" width="0.8" height="0.2" material="shader:flat; color:#E0E0E0" class="clickable" onclick="handlePlayButton()">
-                    <a-text id="txt-play-vr" value="Play" align="center" width="4" position="0 0 0.01" color="#333"
-                            font="https://cdn.jsdelivr.net/gh/etiennepinchon/aframe-fonts/fonts/mplus1p/mplus1p-regular.json" shader="msdf"></a-text>
+                    <a-text id="txt-play-vr" value="Play" align="center" width="4" position="0 0 0.01" color="#333"></a-text>
                 </a-plane>
 
                 <a-entity id="controls-vr" visible="false">
@@ -146,15 +157,12 @@
                     <a-plane id="h-plane" class="clickable" position="0 -0.35 0" width="0.8" height="0.15" material="shader:flat; src:#h-canvas-vr"></a-plane>
                     <a-plane id="h-cursor" position="0 -0.35 0.01" width="0.02" height="0.17" material="shader:flat; color:#FFF; opacity:0.8" visible="false"></a-plane>
 
-                    <a-text value="Preview:" width="3" position="-0.4 -0.5 0" color="#ccc"
-                            font="https://cdn.jsdelivr.net/gh/etiennepinchon/aframe-fonts/fonts/mplus1p/mplus1p-regular.json" shader="msdf"></a-text>
-                    
+                    <a-text value="Preview:" width="3" position="-0.4 -0.5 0" color="#ccc"></a-text>
                     <a-plane id="vr-preview" position="0 -0.65 0" width="0.8" height="0.2" material="shader:flat; color:#808080; border-color:#eee"></a-plane>
                     <a-plane position="0 -0.65 -0.005" width="0.82" height="0.22" material="shader:flat; color:#ccc"></a-plane>
 
                     <a-plane position="0 -0.9 0" width="0.8" height="0.2" material="shader:flat; color:#E0E0E0" class="clickable" onclick="confirmColor()">
-                        <a-text value="CONFIRM / NEXT" align="center" width="4" position="0 0 0.01" color="#333"
-                                font="https://cdn.jsdelivr.net/gh/etiennepinchon/aframe-fonts/fonts/mplus1p/mplus1p-regular.json" shader="msdf"></a-text>
+                        <a-text value="CONFIRM / NEXT" align="center" width="4" position="0 0 0.01" color="#333"></a-text>
                     </a-plane>
                 </a-entity>
             </a-entity>
@@ -169,10 +177,10 @@
     <script>
         // --- 設定エリア ---
         const AUDIO_FILES = [
-            "音刺激 ヴァイオリン C.wav", 
-            "音刺激 フルート C.wav", 
-            "音刺激 単音 C.wav",
-            "音刺激 単音 F.wav"
+            "音刺激 カデンツ1 ハ長調.wav", 
+            "音刺激 フレーズ1.wav", 
+            "音刺激 ヴァイオリン C.wav",
+            "音刺激 単音 C.wav"
         ];
         
         const PRACTICE_AUDIO = "practice.wav";
@@ -191,6 +199,7 @@
         let isPracticeMode = false;
         let msgTimeout = null;
         
+        // 再生ボタンの状態管理: 'initial' | 'ready_to_loop' | 'looping'
         let audioState = 'initial'; 
 
         let currentH = 0, currentS = 0, currentV = 100;
@@ -296,6 +305,7 @@
             if (conditionId === "1" || conditionId === "2") init2DCanvas();
         }
 
+        // --- ボタン制御 ---
         function handlePlayButton() {
             if (audioState === 'initial') {
                 playFirstTime();
@@ -347,7 +357,7 @@
             const bgVr = document.getElementById('btn-play-vr');
 
             let text = "再生 (Play)";
-            let vrColor = "#E0E0E0"; 
+            let vrColor = "#E0E0E0"; // 通常: 白に近いグレー
             let vrTextColor = "#333";
             let cssClass = "";
 
@@ -356,24 +366,27 @@
                 vrColor = "#E0E0E0";
             } else if (audioState === 'ready_to_loop') {
                 text = "ループ再生 (Loop Start)";
-                vrColor = "#E0E0E0"; 
+                vrColor = "#E0E0E0"; // 色は変えず文字だけ変える
             } else if (audioState === 'looping') {
                 text = "停止 (Stop)";
-                vrColor = "#404040"; 
-                vrTextColor = "#FFF"; 
+                vrColor = "#404040"; // 押下中: 濃いグレー
+                vrTextColor = "#FFF"; // 文字は白
                 cssClass = "active";
             }
 
+            // 2D反映
             if(btn2d) {
                 btn2d.innerText = text;
                 btn2d.className = cssClass; 
             }
+            // VR反映
             if(txtVr && bgVr) {
                 txtVr.setAttribute('value', text);
                 txtVr.setAttribute('color', vrTextColor);
                 bgVr.setAttribute('material', 'color', vrColor);
             }
         }
+        // -----------------------------
 
         function showMessage(text) {
             console.log("Message:", text);
@@ -403,7 +416,7 @@
                 setTimeout(() => {
                     document.getElementById('ui-2d').style.display = 'none';
                     document.getElementById('vr-scene-container').style.display = 'none';
-                    document.body.style.backgroundColor = "#808080"; 
+                    document.body.style.backgroundColor = "#FFFFFF"; 
                     document.getElementById('overlay').classList.remove('hidden');
                     document.getElementById('setup-screen').classList.remove('hidden');
                     isPracticeMode = false;
@@ -461,7 +474,9 @@
                 }
                 const vrControls = document.getElementById('controls-vr');
                 if(vrControls) vrControls.setAttribute('visible', false);
+                
                 document.getElementById('btn-play-vr').setAttribute('visible', false);
+                
             } else {
                 vrContainer.style.display = 'none';
             }
