@@ -98,6 +98,7 @@
     <canvas id="canvas-inst-vr" width="512" height="128" style="display:none;"></canvas>
     <canvas id="canvas-play-vr" width="512" height="128" style="display:none;"></canvas>
     <canvas id="canvas-confirm-vr" width="512" height="128" style="display:none;"></canvas>
+
     <div id="ui-2d">
         <h3 id="trial-info-2d" style="margin-top:0;">Trial 1</h3>
         <p id="instruction-2d">音を聴いて、想起する色を選んでください</p>
@@ -163,8 +164,7 @@
                              material="shader:flat; src:#canvas-confirm-vr" 
                              class="clickable" onclick="confirmColor()">
                     </a-plane>
-                    
-                    </a-entity>
+                </a-entity>
             </a-entity>
 
             <a-entity id="player" position="0 0 0">
@@ -196,8 +196,7 @@
         let isPracticeMode = false;
         let msgTimeout = null;
         let audioState = 'initial'; 
-        // ★初期色を完全なグレー（H0 S0 V50）に設定
-        let currentH = 0, currentS = 0, currentV = 50;
+        let currentH = 0, currentS = 0, currentV = 50; // 初期色: グレー
 
         let experimentPlaylist = [];
 
@@ -242,7 +241,6 @@
             
             showMessage("Adjust Volume & Practice");
 
-            // 2Dには終了ボタンを残す（2Dテスト用）
             document.getElementById('btn-end-practice-2d').style.display = 'inline-block';
         }
 
@@ -316,8 +314,8 @@
                 const sphere = document.getElementById('env-sphere');
                 sphere.setAttribute('visible', true);
                 
-                // ★ここで明示的に初期色をセット
-                const initialColor = hsvToHslCss(0, 0, 50); // #808080
+                // 初期色をセット
+                const initialColor = hsvToHslCss(0, 0, 50); 
                 sphere.setAttribute('material', 'color', initialColor); 
                 
                 const grid = document.getElementById('env-grid');
@@ -345,7 +343,6 @@
         }
 
         function resetTrialState() {
-            // ★初期化：グレー
             currentH = 0; currentS = 0; currentV = 50;
             isAudioPlayed = false;
             audioState = 'initial'; 
@@ -624,7 +621,7 @@
             drawSV();
         }
 
-        // ▼ 改良版: ポインターのズレ解消 + 背景スムージング
+        // ▼ 修正版: ポインターのズレ解消 (Y+0.05) + スムージング
         AFRAME.registerComponent('color-picker-panel', {
             init: function () {
                 this.svPlane = document.querySelector('#sv-plane');
@@ -643,13 +640,11 @@
                 this.draggingTarget = null;
                 this.raycasterEl = document.querySelector('[raycaster]'); 
 
-                // 背景色用のスムージング変数
                 this.targetH = currentH; this.targetS = currentS; this.targetV = currentV;
                 this.displayH = currentH; this.displayS = currentS; this.displayV = currentV;
 
                 const startDrag = (evt) => {
                     this.draggingTarget = evt.target;
-                    // クリックした瞬間もターゲット更新＆カーソル即反映
                     if (evt.detail.intersection) {
                         this.processIntersection(evt.detail.intersection);
                     }
@@ -662,7 +657,6 @@
             },
 
             tick: function () {
-                // 1. ドラッグ中ならターゲットを更新し、カーソル位置を即時反映（ズレ防止）
                 if (this.draggingTarget && this.raycasterEl) {
                     const raycaster = this.raycasterEl.components.raycaster;
                     const intersection = raycaster.getIntersection(this.draggingTarget);
@@ -671,13 +665,12 @@
                     }
                 }
 
-                // 2. 背景色のスムージング (表示値 -> 目標値 へ徐々に変化)
-                const factor = 0.5; // 遅延具合
+                // スムージング (背景色のみ)
+                const factor = 0.1; 
                 if (Math.abs(this.targetH - this.displayH) > 0.1) this.displayH += (this.targetH - this.displayH) * factor;
                 if (Math.abs(this.targetS - this.displayS) > 0.1) this.displayS += (this.targetS - this.displayS) * factor;
                 if (Math.abs(this.targetV - this.displayV) > 0.1) this.displayV += (this.targetV - this.displayV) * factor;
 
-                // 3. 画面反映 (背景色のみスムージング適用)
                 const newIntH = Math.round(this.displayH);
                 const newIntS = Math.round(this.displayS);
                 const newIntV = Math.round(this.displayV);
@@ -688,15 +681,12 @@
                 }
             },
 
-            // 交差座標を処理する関数
             processIntersection: function(intersect) {
                 const uv = intersect.uv;
                 
-                // 目標値をセット
                 if (intersect.object.el === this.svPlane) {
                     this.targetS = uv.x * 100;
                     this.targetV = uv.y * 100;
-                    // ★カーソル位置は「スムージング無し」で即座に更新
                     this.updateCursorVisuals(this.targetH, this.targetS, this.targetV);
                 } else if (intersect.object.el === this.hPlane) {
                     this.targetH = uv.x * 360;
@@ -704,10 +694,10 @@
                 }
             },
 
-            // カーソル位置の更新 (即時反映用)
+            // ★修正箇所: SVカーソルのY座標計算 (0.05)
             updateCursorVisuals: function(h, s, v) {
                 const x_sv = (s / 100 - 0.5) * 0.8;
-                const y_sv = (v / 100 - 0.5) * 0.8 + 0.15;
+                const y_sv = (v / 100 - 0.5) * 0.8 + 0.05; 
                 this.svCursor.setAttribute('position', { x: x_sv, y: y_sv, z: 0.01 });
                 this.svCursor.setAttribute('visible', true);
 
