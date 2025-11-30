@@ -171,20 +171,18 @@
             </a-entity>
         </a-scene>
     </div>
-
-    <script>
+<script>
         // --- 設定エリア ---
         const AUDIO_FILES = [
-"音刺激 カデンツ1 ハ長調.mp3",
-"音刺激 曲フレーズ ジムノペディ.mp3",
-"音刺激 単音 piano C4.mp3",
-"音刺激 単音 ヴァイオリン C4.mp3"
+            "音刺激 カデンツ1 ハ長調.mp3",
+            "音刺激 曲フレーズ ジムノペディ.mp3",
+            "音刺激 単音 piano C4.mp3",
+            "音刺激 単音 ヴァイオリン C4.mp3"
         ];
         
         const PRACTICE_AUDIO = "practice.wav";
-        const DELAY_MS = 3000; 
-
-        // GAS URL
+        
+        // GAS URL (既存のまま)
         const GAS_URL ="https://script.google.com/macros/s/AKfycbwO-b3LMxtAIAf3p-cZbfWNehT56fc5lRnAUJb4dct9eAzdLJWSzXxi20Dgw9YUAEA/exec";
         // ----------------
 
@@ -199,11 +197,15 @@
         let audioState = 'initial'; 
         let currentH = 0, currentS = 0, currentV = 100;
 
+        // ★追加: 本番用のプレイリストを格納する配列
+        let experimentPlaylist = [];
+
         const ui2d = document.getElementById('ui-2d');
         const vrContainer = document.getElementById('vr-scene-container');
         const audioPlayer = document.getElementById('audio-player');
         
-        document.getElementById('audio-count').innerText = AUDIO_FILES.length + "ファイル";
+        // 初期表示は「4種類×2 = 8ファイル」であることを示すため計算して表示
+        document.getElementById('audio-count').innerText = (AUDIO_FILES.length * 2) + "ファイル (各2回)";
 
         audioPlayer.addEventListener('timeupdate', function() {
             if (!isAudioPlayed && audioPlayer.duration > 0 && (audioPlayer.duration - audioPlayer.currentTime <= 1.0)) {
@@ -241,7 +243,6 @@
             
             showMessage("Adjust Volume & Practice");
 
-            // 練習終了ボタンを表示
             document.getElementById('btn-end-practice-2d').style.display = 'inline-block';
             const btnEndVr = document.getElementById('btn-end-practice-vr');
             if(btnEndVr) btnEndVr.setAttribute('visible', true);
@@ -267,7 +268,8 @@
             
             if(!participantId) { alert("参加者IDを入力してください"); return; }
             
-            shuffleArray(AUDIO_FILES);
+            // ★変更点: 音源リストを2倍にし、連続しないようにシャッフルしてプレイリストを作成
+            createExperimentPlaylist();
 
             document.getElementById('setup-screen').classList.add('hidden');
             document.getElementById('overlay').classList.add('hidden');
@@ -277,10 +279,31 @@
             setupConditionView(conditionId);
             loadTrial(0);
 
-            // 練習終了ボタンを隠す
             document.getElementById('btn-end-practice-2d').style.display = 'none';
             const btnEndVr = document.getElementById('btn-end-practice-vr');
             if(btnEndVr) btnEndVr.setAttribute('visible', false);
+        }
+
+        // ★新規追加: プレイリスト作成関数
+        function createExperimentPlaylist() {
+            // 1. リストを複製して結合 (例: [A,B,C,D] -> [A,B,C,D,A,B,C,D])
+            let list = AUDIO_FILES.concat(AUDIO_FILES);
+            
+            // 2. 連続しない条件を満たすまでシャッフルを繰り返す
+            let isValid = false;
+            while (!isValid) {
+                shuffleArray(list);
+                isValid = true;
+                // 隣り合う要素が同じかチェック
+                for (let i = 1; i < list.length; i++) {
+                    if (list[i] === list[i-1]) {
+                        isValid = false;
+                        break;
+                    }
+                }
+            }
+            experimentPlaylist = list;
+            console.log("Playlist generated:", experimentPlaylist);
         }
 
         function shuffleArray(array) {
@@ -309,14 +332,16 @@
         }
 
         function loadTrial(index) {
-            if (index >= AUDIO_FILES.length) {
+            // ★変更点: experimentPlaylist を使用
+            if (index >= experimentPlaylist.length) {
                 finishExperiment();
                 return;
             }
             currentTrialIdx = index;
             
-            const trialText = `Trial ${index + 1} / ${AUDIO_FILES.length}`;
-            const audioName = AUDIO_FILES[index];
+            // 全試行数は experimentPlaylist.length (8回)
+            const trialText = `Trial ${index + 1} / ${experimentPlaylist.length}`;
+            const audioName = experimentPlaylist[index];
             
             document.getElementById('trial-info-2d').innerText = trialText;
             const vrTrialEl = document.getElementById('vr-trial-info');
@@ -360,7 +385,6 @@
             audioPlayer.currentTime = 0;
             audioPlayer.play().then(() => {
                 showMessage("Listening...");
-                // 1回再生後、timeupdateイベントでパネルが表示される
             }).catch(e => showMessage("Error: Audio not found"));
         }
 
@@ -434,22 +458,21 @@
 
             if(audioState === 'looping') stopLooping();
 
-            // ★ 練習モード: 保存せずリセット（ループする）
             if (isPracticeMode) {
                 showMessage("Practice Trial Done. Try again.");
-                // 色をリセットして再試行（再生ボタン待ちに戻る）
                 resetTrialState();
                 return;
             }
 
-            // 本番: データ保存して次へ
             const rt = Date.now() - startTime;
             const hsl = hsvToHslCss(currentH, currentS, currentV);
+            
+            // ★変更点: experimentPlaylist を使用
             const record = {
                 participant_id: participantId,
                 condition: conditionId,
                 trial_number: currentTrialIdx + 1,
-                audio_file: AUDIO_FILES[currentTrialIdx],
+                audio_file: experimentPlaylist[currentTrialIdx], // ここを変更
                 h: currentH, s: currentS, v: currentV,
                 hsl_css: hsl,
                 reaction_time_ms: rt,
