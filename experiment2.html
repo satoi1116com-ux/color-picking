@@ -96,7 +96,8 @@
     </div>
 
     <audio id="audio-player"></audio>
-
+    <canvas id="canvas-play-vr" width="512" height="128" style="display:none;"></canvas>
+    
     <div id="ui-2d">
         <h3 id="trial-info-2d" style="margin-top:0;">Trial 1</h3>
         <p id="instruction-2d">音を聴いて、想起する色を選んでください</p>
@@ -135,9 +136,9 @@
                 <a-text id="vr-message" value="" align="center" width="2" position="0 1.0 0.05" color="#FFFF00"
                         font="https://cdn.jsdelivr.net/gh/etiennepinchon/aframe-fonts/fonts/mplus1p/mplus1p-regular.json" shader="msdf"></a-text>
                 
-                <a-plane id="btn-play-vr" position="0 0.7 0" width="0.8" height="0.2" material="shader:flat; color:#E0E0E0" class="clickable" onclick="handlePlayButton()">
-                    <a-text id="txt-play-vr" value="Play" align="center" width="4" position="0 0 0.01" color="#333"
-                            font="https://cdn.jsdelivr.net/gh/etiennepinchon/aframe-fonts/fonts/mplus1p/mplus1p-regular.json" shader="msdf"></a-text>
+                <a-plane id="btn-play-vr" position="0 0.7 0" width="0.8" height="0.2" 
+                         material="shader:flat; src:#canvas-play-vr" 
+                         class="clickable" onclick="handlePlayButton()">
                 </a-plane>
 
                 <a-entity id="controls-vr" visible="false">
@@ -403,45 +404,66 @@
             updateButtonState();
         }
 
-function updateButtonState() {
+// ▼ ボタンの状態を更新する関数（全面的に書き換え）
+        function updateButtonState() {
             const btn2d = document.getElementById('btn-play-2d');
-            const txtVr = document.getElementById('txt-play-vr');
-            const bgVr = document.getElementById('btn-play-vr');
-
-            // 2D画面用（日本語OK）とVR用（英語推奨）で変数を分ける
-            let text2d = "再生 (Play)";
-            let textVr = "Play";
             
-            let vrColor = "#E0E0E0"; 
+            // 表示したいテキスト（日本語OK）
+            let text = "再生 (Play)";
+            let vrBgColor = "#E0E0E0"; 
             let vrTextColor = "#333";
             let cssClass = "";
 
             if (audioState === 'initial') {
-                text2d = "再生 (Play)";
-                textVr = "Play";
+                text = "再生 (Play)";
             } else if (audioState === 'ready_to_loop') {
-                text2d = "ループ開始 (Loop)";
-                textVr = "Loop";
+                text = "ループ開始 (Loop)";
             } else if (audioState === 'looping') {
-                text2d = "停止 (Stop)";
-                textVr = "Stop";
-                
-                vrColor = "#404040"; 
+                text = "停止 (Stop)";
+                vrBgColor = "#d32f2f"; // 停止中は赤色に
                 vrTextColor = "#FFF"; 
                 cssClass = "active";
             }
 
             // 2Dボタンの更新
             if(btn2d) {
-                btn2d.innerText = text2d;
+                btn2d.innerText = text;
                 btn2d.className = cssClass; 
             }
             
-            // VRボタンの更新（英語を使用）
-            if(txtVr && bgVr) {
-                txtVr.setAttribute('value', textVr);
-                txtVr.setAttribute('color', vrTextColor);
-                bgVr.setAttribute('material', 'color', vrColor);
+            // VRボタンの更新 (Canvasに日本語を描画)
+            drawVrButton(text, vrBgColor, vrTextColor);
+        }
+
+        // ▼ 追加: VRボタン用キャンバス描画関数
+        function drawVrButton(text, bgColor, textColor) {
+            const canvas = document.getElementById('canvas-play-vr');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            
+            // 背景を塗る
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 枠線を描く
+            ctx.strokeStyle = textColor;
+            ctx.lineWidth = 10;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+            // 文字を描く（日本語フォント指定）
+            ctx.fillStyle = textColor;
+            ctx.font = "bold 60px sans-serif"; 
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+            // A-Frameに「テクスチャが更新された」と通知
+            const btnEl = document.getElementById('btn-play-vr');
+            if (btnEl) {
+                const mesh = btnEl.getObject3D('mesh');
+                if (mesh && mesh.material && mesh.material.map) {
+                    mesh.material.map.needsUpdate = true;
+                }
             }
         }
 
