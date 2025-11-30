@@ -98,8 +98,6 @@
     <canvas id="canvas-inst-vr" width="512" height="128" style="display:none;"></canvas>
     <canvas id="canvas-play-vr" width="512" height="128" style="display:none;"></canvas>
     <canvas id="canvas-confirm-vr" width="512" height="128" style="display:none;"></canvas>
-    <canvas id="canvas-end-vr" width="512" height="128" style="display:none;"></canvas>
-
     <div id="ui-2d">
         <h3 id="trial-info-2d" style="margin-top:0;">Trial 1</h3>
         <p id="instruction-2d">音を聴いて、想起する色を選んでください</p>
@@ -130,7 +128,7 @@
             <a-grid id="env-grid" width="20" height="20" divisions="20" material="shader:flat; color:#404040" position="0 0.01 0"></a-grid>
 
             <a-entity id="control-panel" position="0 1.3 -2.5" rotation="-15 0 0" color-picker-panel>
-                <a-plane position="0 -0.1 -0.01" width="1.2" height="3.2" material="shader:flat; color:#808080"></a-plane>
+                <a-plane position="0 0.05 -0.01" width="1.2" height="2.9" material="shader:flat; color:#808080"></a-plane>
                 
                 <a-plane id="info-plane-vr" position="0 1.25 0" width="1.0" height="0.2" 
                          material="shader:flat; src:#canvas-trial-vr; transparent:true">
@@ -166,11 +164,7 @@
                              class="clickable" onclick="confirmColor()">
                     </a-plane>
                     
-                    <a-plane id="btn-end-practice-vr" position="0 -1.35 0" width="0.8" height="0.2" 
-                         material="shader:flat; src:#canvas-end-vr" 
-                         class="clickable" visible="false" onclick="endPractice()">
-                    </a-plane>
-                </a-entity>
+                    </a-entity>
             </a-entity>
 
             <a-entity id="player" position="0 0 0">
@@ -202,7 +196,8 @@
         let isPracticeMode = false;
         let msgTimeout = null;
         let audioState = 'initial'; 
-        let currentH = 0, currentS = 0, currentV = 100;
+        // ★初期色を完全なグレー（H0 S0 V50）に設定
+        let currentH = 0, currentS = 0, currentV = 50;
 
         let experimentPlaylist = [];
 
@@ -210,10 +205,8 @@
         const vrContainer = document.getElementById('vr-scene-container');
         const audioPlayer = document.getElementById('audio-player');
         
-        // 初期表示
         document.getElementById('audio-count').innerText = (AUDIO_FILES.length * 2) + "ファイル (各2回)";
 
-        // 3秒前判定
         audioPlayer.addEventListener('timeupdate', function() {
             if (!isAudioPlayed && audioPlayer.duration > 0 && (audioPlayer.duration - audioPlayer.currentTime <= 3.0)) {
                 isAudioPlayed = true;
@@ -242,7 +235,6 @@
             document.getElementById('trial-info-2d').innerText = infoText;
             document.getElementById('instruction-2d').innerText = "音量を調整し、操作を確認してください";
             
-            // VR: Canvasに練習モードと描画
             drawCanvasText('canvas-trial-vr', 'info-plane-vr', "Practice Mode", "#808080", "#FFFFFF", 40);
 
             audioPlayer.src = "audio/" + PRACTICE_AUDIO;
@@ -250,9 +242,8 @@
             
             showMessage("Adjust Volume & Practice");
 
+            // 2Dには終了ボタンを残す（2Dテスト用）
             document.getElementById('btn-end-practice-2d').style.display = 'inline-block';
-            const btnEndVr = document.getElementById('btn-end-practice-vr');
-            if(btnEndVr) btnEndVr.setAttribute('visible', true);
         }
 
         function endPractice() {
@@ -286,8 +277,6 @@
             loadTrial(0);
 
             document.getElementById('btn-end-practice-2d').style.display = 'none';
-            const btnEndVr = document.getElementById('btn-end-practice-vr');
-            if(btnEndVr) btnEndVr.setAttribute('visible', false);
         }
 
         function createExperimentPlaylist() {
@@ -326,7 +315,11 @@
                 vrContainer.style.display = 'block';
                 const sphere = document.getElementById('env-sphere');
                 sphere.setAttribute('visible', true);
-                sphere.setAttribute('material', 'color', '#808080'); 
+                
+                // ★ここで明示的に初期色をセット
+                const initialColor = hsvToHslCss(0, 0, 50); // #808080
+                sphere.setAttribute('material', 'color', initialColor); 
+                
                 const grid = document.getElementById('env-grid');
                 if(grid) grid.setAttribute('material', 'color', '#404040');
             }
@@ -343,8 +336,6 @@
             const audioName = experimentPlaylist[index];
             
             document.getElementById('trial-info-2d').innerText = trialText;
-            
-            // VR: Canvasにトライアル数を描画
             drawCanvasText('canvas-trial-vr', 'info-plane-vr', trialText, "#808080", "#FFFFFF", 50);
 
             audioPlayer.src = "audio/" + audioName; 
@@ -354,6 +345,7 @@
         }
 
         function resetTrialState() {
+            // ★初期化：グレー
             currentH = 0; currentS = 0; currentV = 50;
             isAudioPlayed = false;
             audioState = 'initial'; 
@@ -403,92 +395,58 @@
             updateButtonState();
         }
 
-        // --- 汎用Canvas描画関数 ---
         function drawCanvasText(canvasId, elementId, text, bgColor, textColor, fontSize = 60) {
             const canvas = document.getElementById(canvasId);
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
-            
-            ctx.fillStyle = bgColor;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            ctx.fillStyle = textColor;
-            ctx.font = `bold ${fontSize}px sans-serif`;
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
+            ctx.fillStyle = bgColor; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = textColor; ctx.font = `bold ${fontSize}px sans-serif`;
+            ctx.textAlign = "center"; ctx.textBaseline = "middle";
             ctx.fillText(text, canvas.width / 2, canvas.height / 2);
 
             const btnEl = document.getElementById(elementId);
             if (btnEl) {
                 const mesh = btnEl.getObject3D('mesh');
-                if (mesh && mesh.material && mesh.material.map) {
-                    mesh.material.map.needsUpdate = true;
-                }
+                if (mesh && mesh.material && mesh.material.map) mesh.material.map.needsUpdate = true;
             }
         }
         
-        // --- ★新規追加: 説明文専用の描画関数 (2行表示・太字) ---
         function drawInstructionCanvas() {
             const canvas = document.getElementById('canvas-inst-vr');
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
-            
-            // 背景（パネルと同色）
-            ctx.fillStyle = "#808080";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // 文字設定（太く大きく）
-            ctx.fillStyle = "#FFFFFF";
-            ctx.font = "bold 35px sans-serif";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            
-            // 2行に分けて描画
+            ctx.fillStyle = "#808080"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#FFFFFF"; ctx.font = "bold 35px sans-serif";
+            ctx.textAlign = "center"; ctx.textBaseline = "middle";
             ctx.fillText("音を聴いて、", canvas.width / 2, 40);
             ctx.fillText("想起する色を選んでください", canvas.width / 2, 90);
             
-            // 更新通知
             const btnEl = document.getElementById('inst-plane-vr');
             if (btnEl) {
                 const mesh = btnEl.getObject3D('mesh');
-                if (mesh && mesh.material && mesh.material.map) {
-                    mesh.material.map.needsUpdate = true;
-                }
+                if (mesh && mesh.material && mesh.material.map) mesh.material.map.needsUpdate = true;
             }
         }
         
-        // --- ボタン用 (枠線付き) ---
         function drawCanvasButton(canvasId, elementId, text, bgColor, textColor) {
             const canvas = document.getElementById(canvasId);
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
-            
-            ctx.fillStyle = bgColor;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            ctx.strokeStyle = textColor;
-            ctx.lineWidth = 10;
-            ctx.strokeRect(0, 0, canvas.width, canvas.height);
-
-            ctx.fillStyle = textColor;
-            ctx.font = "bold 60px sans-serif"; 
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
+            ctx.fillStyle = bgColor; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = textColor; ctx.lineWidth = 10; ctx.strokeRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = textColor; ctx.font = "bold 60px sans-serif"; 
+            ctx.textAlign = "center"; ctx.textBaseline = "middle";
             ctx.fillText(text, canvas.width / 2, canvas.height / 2);
 
             const btnEl = document.getElementById(elementId);
             if (btnEl) {
                 const mesh = btnEl.getObject3D('mesh');
-                if (mesh && mesh.material && mesh.material.map) {
-                    mesh.material.map.needsUpdate = true;
-                }
+                if (mesh && mesh.material && mesh.material.map) mesh.material.map.needsUpdate = true;
             }
         }
 
-        // --- ボタン状態更新 ---
         function updateButtonState() {
             const btn2d = document.getElementById('btn-play-2d');
-            
             let text = "再生 (Play)";
             let vrBgColor = "#E0E0E0"; 
             let vrTextColor = "#333";
@@ -505,30 +463,19 @@
                 cssClass = "active";
             }
 
-            if(btn2d) {
-                btn2d.innerText = text;
-                btn2d.className = cssClass; 
-            }
-            
+            if(btn2d) { btn2d.innerText = text; btn2d.className = cssClass; }
             drawCanvasButton('canvas-play-vr', 'btn-play-vr', text, vrBgColor, vrTextColor);
         }
 
-        // --- 初期化処理 ---
         window.addEventListener('load', function() {
-            // 固定ボタンの描画
             drawCanvasButton('canvas-confirm-vr', 'btn-confirm-vr', '決定して次へ', '#E0E0E0', '#333');
-            drawCanvasButton('canvas-end-vr', 'btn-end-practice-vr', '練習を終了', '#d32f2f', '#FFF');
-            
-            // 説明文の描画（専用関数を使用）
             drawInstructionCanvas();
-            
             updateButtonState();
         });
 
         function showMessage(text) {
             console.log("Message:", text);
             if (msgTimeout) clearTimeout(msgTimeout);
-
             if (conditionId === "3" || conditionId === "4") {
                 const msgEl = document.getElementById('vr-message');
                 if (msgEl) {
@@ -541,11 +488,7 @@
         }
 
         function confirmColor() {
-            if (!isAudioPlayed) {
-                showMessage("Please play sound first!");
-                return;
-            }
-
+            if (!isAudioPlayed) { showMessage("Please play sound first!"); return; }
             if(audioState === 'looping') stopLooping();
 
             if (isPracticeMode) {
@@ -569,7 +512,6 @@
             };
             
             sendToGoogleSheets(record);
-
             showMessage("Recorded! Next trial...");
             results.push(record);
             loadTrial(currentTrialIdx + 1);
@@ -581,11 +523,7 @@
                 mode: "no-cors",
                 headers: { "Content-Type": "text/plain" },
                 body: JSON.stringify(data)
-            }).then(() => {
-                console.log("Data sent to Google Sheets");
-            }).catch(err => {
-                console.error("Failed to send data:", err);
-            });
+            }).then(() => { console.log("Data sent"); }).catch(err => { console.error("Failed", err); });
         }
 
         function finishExperiment() {
@@ -606,9 +544,7 @@
                 const vrControls = document.getElementById('controls-vr');
                 if(vrControls) vrControls.setAttribute('visible', false);
                 document.getElementById('btn-play-vr').setAttribute('visible', false);
-            } else {
-                vrContainer.style.display = 'none';
-            }
+            } else { vrContainer.style.display = 'none'; }
         }
 
         function downloadCSV() {
@@ -619,9 +555,7 @@
             const blob = new Blob([csvContent], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url;
-            a.download = `exp2_${participantId}_cond${conditionId}.csv`;
-            a.click();
+            a.href = url; a.download = `exp2_${participantId}_cond${conditionId}.csv`; a.click();
         }
 
         function updateColor(h, s, v) {
@@ -666,8 +600,7 @@
 
             function drawSV() {
                 const w = canvas.width, h = canvas.height;
-                ctx.fillStyle = `hsl(${slider.value}, 100%, 50%)`;
-                ctx.fillRect(0,0,w,h);
+                ctx.fillStyle = `hsl(${slider.value}, 100%, 50%)`; ctx.fillRect(0,0,w,h);
                 const wg = ctx.createLinearGradient(0,0,w,0);
                 wg.addColorStop(0,'white'); wg.addColorStop(1,'rgba(255,255,255,0)');
                 ctx.fillStyle = wg; ctx.fillRect(0,0,w,h);
@@ -691,7 +624,7 @@
             drawSV();
         }
 
-        // ▼ スムージング処理対応コンポーネント
+        // ▼ 改良版: ポインターのズレ解消 + 背景スムージング
         AFRAME.registerComponent('color-picker-panel', {
             init: function () {
                 this.svPlane = document.querySelector('#sv-plane');
@@ -710,14 +643,15 @@
                 this.draggingTarget = null;
                 this.raycasterEl = document.querySelector('[raycaster]'); 
 
-                // スムージング用変数
+                // 背景色用のスムージング変数
                 this.targetH = currentH; this.targetS = currentS; this.targetV = currentV;
                 this.displayH = currentH; this.displayS = currentS; this.displayV = currentV;
 
                 const startDrag = (evt) => {
                     this.draggingTarget = evt.target;
+                    // クリックした瞬間もターゲット更新＆カーソル即反映
                     if (evt.detail.intersection) {
-                        this.setTargetFromIntersection(evt.detail.intersection);
+                        this.processIntersection(evt.detail.intersection);
                     }
                 };
                 const stopDrag = () => { this.draggingTarget = null; };
@@ -728,43 +662,49 @@
             },
 
             tick: function () {
-                // 1. 目標値更新
+                // 1. ドラッグ中ならターゲットを更新し、カーソル位置を即時反映（ズレ防止）
                 if (this.draggingTarget && this.raycasterEl) {
                     const raycaster = this.raycasterEl.components.raycaster;
                     const intersection = raycaster.getIntersection(this.draggingTarget);
                     if (intersection) {
-                        this.setTargetFromIntersection(intersection);
+                        this.processIntersection(intersection);
                     }
                 }
 
-                // 2. スムージング (線形補間)
-                const factor = 0.25; 
+                // 2. 背景色のスムージング (表示値 -> 目標値 へ徐々に変化)
+                const factor = 0.5; // 遅延具合
                 if (Math.abs(this.targetH - this.displayH) > 0.1) this.displayH += (this.targetH - this.displayH) * factor;
                 if (Math.abs(this.targetS - this.displayS) > 0.1) this.displayS += (this.targetS - this.displayS) * factor;
                 if (Math.abs(this.targetV - this.displayV) > 0.1) this.displayV += (this.targetV - this.displayV) * factor;
 
-                // 3. 描画反映
+                // 3. 画面反映 (背景色のみスムージング適用)
                 const newIntH = Math.round(this.displayH);
                 const newIntS = Math.round(this.displayS);
                 const newIntV = Math.round(this.displayV);
 
                 if (newIntH !== currentH || newIntS !== currentS || newIntV !== currentV) {
-                    this.updateCursorVisuals(newIntH, newIntS, newIntV);
                     if (newIntH !== currentH) this.drawSV(newIntH);
                     updateColor(newIntH, newIntS, newIntV);
                 }
             },
 
-            setTargetFromIntersection: function(intersect) {
+            // 交差座標を処理する関数
+            processIntersection: function(intersect) {
                 const uv = intersect.uv;
+                
+                // 目標値をセット
                 if (intersect.object.el === this.svPlane) {
                     this.targetS = uv.x * 100;
                     this.targetV = uv.y * 100;
+                    // ★カーソル位置は「スムージング無し」で即座に更新
+                    this.updateCursorVisuals(this.targetH, this.targetS, this.targetV);
                 } else if (intersect.object.el === this.hPlane) {
                     this.targetH = uv.x * 360;
+                    this.updateCursorVisuals(this.targetH, this.targetS, this.targetV);
                 }
             },
 
+            // カーソル位置の更新 (即時反映用)
             updateCursorVisuals: function(h, s, v) {
                 const x_sv = (s / 100 - 0.5) * 0.8;
                 const y_sv = (v / 100 - 0.5) * 0.8 + 0.15;
