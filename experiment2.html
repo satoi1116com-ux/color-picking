@@ -198,6 +198,10 @@
         let audioState = 'initial'; 
         let currentH = 0, currentS = 0, currentV = 50; // 初期色: グレー
 
+        // ログ用変数
+        let playCount = 0;
+        let operationCount = 0;
+
         let experimentPlaylist = [];
 
         const ui2d = document.getElementById('ui-2d');
@@ -240,7 +244,6 @@
             resetTrialState();
             
             showMessage("Adjust Volume & Practice");
-
             document.getElementById('btn-end-practice-2d').style.display = 'inline-block';
         }
 
@@ -308,12 +311,11 @@
             
             if (cond === "1" || cond === "2") {
                 ui2d.style.display = 'block';
-                init2DCanvas();
+                init2DCanvas(); // 初期化（リスナー登録）
             } else {
                 vrContainer.style.display = 'block';
                 const sphere = document.getElementById('env-sphere');
                 sphere.setAttribute('visible', true);
-                
                 // 初期色をセット
                 const initialColor = hsvToHslCss(0, 0, 50); 
                 sphere.setAttribute('material', 'color', initialColor); 
@@ -343,6 +345,10 @@
         }
 
         function resetTrialState() {
+            // カウンターリセット
+            playCount = 0;
+            operationCount = 0;
+
             currentH = 0; currentS = 0; currentV = 50;
             isAudioPlayed = false;
             audioState = 'initial'; 
@@ -356,10 +362,15 @@
             
             const slider = document.getElementById('h-slider-2d');
             if(slider) slider.value = 0;
-            if (conditionId === "1" || conditionId === "2") init2DCanvas();
+            
+            // 2Dの場合、再描画してカーソルを初期位置に戻す
+            if (conditionId === "1" || conditionId === "2") {
+                draw2DVisuals(); 
+            }
         }
 
         function handlePlayButton() {
+            playCount++; // 行動ログ
             if (audioState === 'initial') {
                 playFirstTime();
             } else if (audioState === 'ready_to_loop') {
@@ -392,6 +403,7 @@
             updateButtonState();
         }
 
+        // --- 共通描画関数 ---
         function drawCanvasText(canvasId, elementId, text, bgColor, textColor, fontSize = 60) {
             const canvas = document.getElementById(canvasId);
             if (!canvas) return;
@@ -505,6 +517,9 @@
                 h: currentH, s: currentS, v: currentV,
                 hsl_css: hsl,
                 reaction_time_ms: rt,
+                play_count: playCount,
+                operation_count: operationCount,
+                user_agent: navigator.userAgent,
                 timestamp: new Date().toISOString()
             };
             
@@ -559,13 +574,17 @@
             currentH = h; currentS = s; currentV = v;
             const cssColor = hsvToHslCss(h, s, v);
 
-            if (conditionId === "1") {
-                document.getElementById('preview-2d').style.backgroundColor = cssColor;
-            } else if (conditionId === "2") {
-                document.getElementById('preview-2d').style.backgroundColor = cssColor;
-                document.body.style.backgroundColor = cssColor;
+            // 2Dプレビュー更新
+            if (conditionId === "1" || conditionId === "2") {
+                const preview = document.getElementById('preview-2d');
+                if(preview) preview.style.backgroundColor = cssColor;
+                
+                if (conditionId === "2") {
+                    document.body.style.backgroundColor = cssColor;
+                }
             }
 
+            // VRプレビュー更新
             if (conditionId === "3" || conditionId === "4") {
                 const vrPreview = document.getElementById('vr-preview');
                 if(vrPreview) vrPreview.setAttribute('material', 'color', cssColor);
@@ -590,38 +609,58 @@
             return `hsl(${h}, ${Math.round(s_hsl * 100)}%, ${Math.round(l * 100)}%)`;
         }
 
+        // --- 2D描画関連の修正版 ---
+        
+        // 外部から呼べるように描画処理を分離
+        function draw2DVisuals() {
+            const canvas = document.getElementById('sv-canvas-2d');
+            const slider = document.getElementById('h-slider-2d');
+            if(!canvas || !slider) return;
+
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width, h = canvas.height;
+
+            // 背景描画
+            ctx.fillStyle = `hsl(${slider.value}, 100%, 50%)`; 
+            ctx.fillRect(0,0,w,h);
+            const wg = ctx.createLinearGradient(0,0,w,0);
+            wg.addColorStop(0,'white'); wg.addColorStop(1,'rgba(255,255,255,0)');
+            ctx.fillStyle = wg; ctx.fillRect(0,0,w,h);
+            const bg = ctx.createLinearGradient(0,0,0,h);
+            bg.addColorStop(0,'rgba(0,0,0,0)'); bg.addColorStop(1,'black');
+            ctx.fillStyle = bg; ctx.fillRect(0,0,w,h);
+
+            // ★追加: カーソルの描画
+            const cursorX = (currentS / 100) * w;
+            const cursorY = (1 - currentV / 100) * h;
+            
+            ctx.beginPath();
+            ctx.arc(cursorX, cursorY, 8, 0, Math.PI * 2);
+            ctx.strokeStyle = "white"; ctx.lineWidth = 3; ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(cursorX, cursorY, 8, 0, Math.PI * 2);
+            ctx.strokeStyle = "black"; ctx.lineWidth = 1; ctx.stroke();
+        }
+
         function init2DCanvas() {
             const canvas = document.getElementById('sv-canvas-2d');
-            const ctx = canvas.getContext('2d');
             const slider = document.getElementById('h-slider-2d');
-
-            function drawSV() {
-                const w = canvas.width, h = canvas.height;
-                ctx.fillStyle = `hsl(${slider.value}, 100%, 50%)`; ctx.fillRect(0,0,w,h);
-                const wg = ctx.createLinearGradient(0,0,w,0);
-                wg.addColorStop(0,'white'); wg.addColorStop(1,'rgba(255,255,255,0)');
-                ctx.fillStyle = wg; ctx.fillRect(0,0,w,h);
-                const bg = ctx.createLinearGradient(0,0,0,h);
-                bg.addColorStop(0,'rgba(0,0,0,0)'); bg.addColorStop(1,'black');
-                ctx.fillStyle = bg; ctx.fillRect(0,0,w,h);
-
-                // ▼ 追加: 2Dカーソル描画処理
-                const cursorX = (currentS / 100) * w;
-                const cursorY = (1 - currentV / 100) * h;
-                
-                ctx.beginPath();
-                ctx.arc(cursorX, cursorY, 8, 0, Math.PI * 2);
-                ctx.strokeStyle = "white";
-                ctx.lineWidth = 3;
-                ctx.stroke();
-                
-                ctx.beginPath();
-                ctx.arc(cursorX, cursorY, 8, 0, Math.PI * 2);
-                ctx.strokeStyle = "black";
-                ctx.lineWidth = 1;
-                ctx.stroke();
+            
+            // 重複登録防止
+            if (canvas.getAttribute('data-init') === 'true') {
+                draw2DVisuals(); // 再描画だけする
+                return;
             }
-            slider.addEventListener('input', () => { drawSV(); updateColor(slider.value, currentS, currentV); });
+            canvas.setAttribute('data-init', 'true');
+
+            // スライダー操作時
+            slider.addEventListener('input', () => { 
+                if(isAudioPlayed) operationCount++;
+                updateColor(slider.value, currentS, currentV);
+                draw2DVisuals(); 
+            });
+
+            // SVキャンバス操作時
             let dragging = false;
             const pick = (e) => {
                 const rect = canvas.getBoundingClientRect();
@@ -630,17 +669,18 @@
                 const s = Math.round((x / rect.width) * 100);
                 const v = Math.round((1 - y / rect.height) * 100);
                 
-                // 色を更新した後、Canvasも再描画してカーソルを動かす
+                if(isAudioPlayed) operationCount++;
                 updateColor(slider.value, s, v);
-                drawSV(); 
+                draw2DVisuals(); 
             };
             canvas.addEventListener('mousedown', (e) => { dragging = true; pick(e); });
             window.addEventListener('mousemove', (e) => { if(dragging) pick(e); });
             window.addEventListener('mouseup', () => dragging = false);
-            drawSV();
+            
+            draw2DVisuals();
         }
 
-        // ▼ 修正版: ポインターのズレ解消 (Y+0.05) + スムージング
+        // ▼ VR用 (ポインターズレ解消 + スムージング)
         AFRAME.registerComponent('color-picker-panel', {
             init: function () {
                 this.svPlane = document.querySelector('#sv-plane');
@@ -684,7 +724,6 @@
                     }
                 }
 
-                // スムージング (背景色のみ)
                 const factor = 0.1; 
                 if (Math.abs(this.targetH - this.displayH) > 0.1) this.displayH += (this.targetH - this.displayH) * factor;
                 if (Math.abs(this.targetS - this.displayS) > 0.1) this.displayS += (this.targetS - this.displayS) * factor;
@@ -702,6 +741,7 @@
 
             processIntersection: function(intersect) {
                 const uv = intersect.uv;
+                if(isAudioPlayed) operationCount++;
                 
                 if (intersect.object.el === this.svPlane) {
                     this.targetS = uv.x * 100;
@@ -713,7 +753,6 @@
                 }
             },
 
-            // ★修正箇所: SVカーソルのY座標計算 (0.05)
             updateCursorVisuals: function(h, s, v) {
                 const x_sv = (s / 100 - 0.5) * 0.8;
                 const y_sv = (v / 100 - 0.5) * 0.8 + 0.05; 
