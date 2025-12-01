@@ -409,9 +409,14 @@
             const slider = document.getElementById('h-slider-2d');
             if(slider) slider.value = 0;
 
-            // ★ ここで色を更新。0,0,50 は #808080 になる。
-            // 条件4ならこの時点で空間がグレーにリセットされる。
+            // ★ ここで色を更新（変数値の反映）
             updateColor(currentH, currentS, currentV);
+
+            // ★★★ 追加: VRパネルの内部状態を強制リセット ★★★
+            const panel = document.getElementById('control-panel');
+            if(panel && panel.components['color-picker-panel']) {
+                panel.components['color-picker-panel'].reset();
+            }
             
             updateButtonState(); 
 
@@ -643,7 +648,6 @@
                 
                 if (conditionId === "4") {
                     // ★条件4ではSphereとGridの両方に色を反映する
-                    // リセット時 (v=50) は #808080 が適用される
                     if(sphere) sphere.setAttribute('material', 'color', cssColor);
                     if(grid) grid.setAttribute('material', 'color', cssColor);
                 } else {
@@ -660,7 +664,7 @@
             return `hsl(${h}, ${Math.round(s_hsl * 100)}%, ${Math.round(l * 100)}%)`;
         }
 
-        // ▼ VR用コンポーネント (ガード処理追加)
+        // ▼ VR用コンポーネント
         AFRAME.registerComponent('color-picker-panel', {
             init: function () {
                 this.svPlane = document.querySelector('#sv-plane');
@@ -695,8 +699,16 @@
                 this.el.sceneEl.addEventListener('mouseup', stopDrag);
             },
 
+            // ★ 追加: リセット用メソッド
+            reset: function() {
+                this.targetH = 0; this.targetS = 0; this.targetV = 50;
+                this.displayH = 0; this.displayS = 0; this.displayV = 50;
+                this.drawSV(0);
+                this.updateCursorVisuals(0, 0, 50);
+            },
+
             tick: function () {
-                // ★★★ 2DモードならVR処理を止める ★★★
+                // 2DモードならVR処理を止める
                 if (conditionId === "1" || conditionId === "2") return; 
 
                 if (this.draggingTarget && this.raycasterEl) {
