@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>実験条件の振り返り</title>
+    <title>実験条件の振り返り（設定機能付き）</title>
     <style>
         body {
-            font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+            font-family: "Helvetica Neue", Arial, sans-serif;
             max-width: 1000px;
             margin: 0 auto;
             padding: 20px;
@@ -14,31 +14,38 @@
             color: #333;
         }
 
-        h1 {
-            text-align: center;
-            margin-bottom: 10px;
-            font-size: 24px;
+        /* ヘッダー周り */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
         }
 
-        p.description {
-            text-align: center;
-            margin-bottom: 30px;
-            color: #666;
+        h1 { margin: 0; font-size: 24px; }
+        
+        .btn-settings {
+            background: #666;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
         }
+        .btn-settings:hover { background: #444; }
 
-        /* 4つの条件をグリッドで表示 */
+        p.description { text-align: center; color: #666; margin-bottom: 30px; }
+
+        /* グリッド表示エリア */
         .grid-container {
             display: grid;
-            grid-template-columns: repeat(2, 1fr); /* 2列 x 2行 */
+            grid-template-columns: repeat(2, 1fr);
             gap: 20px;
         }
+        @media (max-width: 600px) { .grid-container { grid-template-columns: 1fr; } }
 
-        @media (max-width: 600px) {
-            .grid-container {
-                grid-template-columns: 1fr; /* スマホでは1列 */
-            }
-        }
-
+        /* カードデザイン */
         .card {
             background: white;
             border: 1px solid #ddd;
@@ -57,13 +64,12 @@
             border-radius: 20px;
             font-weight: bold;
             margin-bottom: 15px;
-            font-size: 1.1em;
         }
 
         .condition-image {
             width: 100%;
             height: 200px;
-            object-fit: cover; /* 画像の比率を保ちつつ枠に収める */
+            object-fit: cover;
             background-color: #eee;
             border-radius: 4px;
             margin-bottom: 15px;
@@ -76,62 +82,244 @@
             text-align: center;
         }
 
+        /* 設定モーダル */
+        #settings-modal {
+            display: none; /* 初期状態は非表示 */
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 100;
+            overflow-y: auto;
+        }
+
+        .modal-content {
+            background: white;
+            margin: 50px auto;
+            padding: 20px;
+            width: 90%;
+            max-width: 600px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+
+        .modal-section {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .input-group label { width: 60px; font-weight: bold; }
+        .input-group input[type="text"] { flex: 1; padding: 5px; }
+        
+        .order-select-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .order-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .order-row select { padding: 5px; flex: 1; }
+
+        .btn-save {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+        }
+        .btn-save:hover { background: #0056b3; }
+
     </style>
 </head>
 <body>
 
-    <h1>実験条件の確認</h1>
+    <header>
+        <h1>実験条件の確認</h1>
+        <button class="btn-settings" onclick="openSettings()">⚙️ 設定・変更</button>
+    </header>
+
     <p class="description">以下の順序で実験を行いました。アンケート回答時の参考にしてください。</p>
 
     <div id="display-area" class="grid-container">
         </div>
 
-    <script>
-        // ==========================================
-        // 【設定エリア】ここを書き換えてください
-        // ==========================================
+    <div id="settings-modal">
+        <div class="modal-content">
+            <h2>設定</h2>
+            
+            <div class="modal-section">
+                <h3>1. 条件の定義（名前と画像）</h3>
+                <p style="font-size:0.9em; color:#666;">※画像を選択しない場合はそのままになります。</p>
+                <div class="input-group">
+                    <label>条件A</label>
+                    <input type="text" id="name-A" placeholder="例: PC・視覚あり">
+                    <input type="file" id="file-A" accept="image/*">
+                </div>
+                <div class="input-group">
+                    <label>条件B</label>
+                    <input type="text" id="name-B" placeholder="例: PC・視覚なし">
+                    <input type="file" id="file-B" accept="image/*">
+                </div>
+                <div class="input-group">
+                    <label>条件C</label>
+                    <input type="text" id="name-C" placeholder="例: VR・視覚あり">
+                    <input type="file" id="file-C" accept="image/*">
+                </div>
+                <div class="input-group">
+                    <label>条件D</label>
+                    <input type="text" id="name-D" placeholder="例: VR・視覚なし">
+                    <input type="file" id="file-D" accept="image/*">
+                </div>
+            </div>
 
-        // 画像のパスを実際のファイル名（例: 'img/vr_condition.png'）に変更してください
-        // 現在はダミー画像URLを入れています
-        const images = {
-            condA: "https://placehold.jp/300x200.png?text=条件Aの画像", 
-            condB: "https://placehold.jp/3d4070/ffffff/300x200.png?text=条件Bの画像",
-            condC: "https://placehold.jp/703d40/ffffff/300x200.png?text=条件Cの画像",
-            condD: "https://placehold.jp/407044/ffffff/300x200.png?text=条件Dの画像"
+            <div class="modal-section">
+                <h3>2. 今回の実験順序</h3>
+                <div class="order-select-group">
+                    <div class="order-row">
+                        <span>1番目:</span>
+                        <select id="order-1">
+                            <option value="A">条件A</option>
+                            <option value="B">条件B</option>
+                            <option value="C">条件C</option>
+                            <option value="D">条件D</option>
+                        </select>
+                    </div>
+                    <div class="order-row">
+                        <span>2番目:</span>
+                        <select id="order-2">
+                            <option value="A">条件A</option>
+                            <option value="B" selected>条件B</option>
+                            <option value="C">条件C</option>
+                            <option value="D">条件D</option>
+                        </select>
+                    </div>
+                    <div class="order-row">
+                        <span>3番目:</span>
+                        <select id="order-3">
+                            <option value="A">条件A</option>
+                            <option value="B">条件B</option>
+                            <option value="C" selected>条件C</option>
+                            <option value="D">条件D</option>
+                        </select>
+                    </div>
+                    <div class="order-row">
+                        <span>4番目:</span>
+                        <select id="order-4">
+                            <option value="A">条件A</option>
+                            <option value="B">条件B</option>
+                            <option value="C">条件C</option>
+                            <option value="D" selected>条件D</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn-save" onclick="saveAndClose()">保存して表示を更新</button>
+        </div>
+    </div>
+
+    <script>
+        // デフォルトデータ
+        let conditions = {
+            A: { name: "条件A (PC/視覚あり)", img: "https://placehold.jp/300x200.png?text=Cond+A" },
+            B: { name: "条件B (PC/視覚なし)", img: "https://placehold.jp/3d4070/ffffff/300x200.png?text=Cond+B" },
+            C: { name: "条件C (VR/視覚あり)", img: "https://placehold.jp/703d40/ffffff/300x200.png?text=Cond+C" },
+            D: { name: "条件D (VR/視覚なし)", img: "https://placehold.jp/407044/ffffff/300x200.png?text=Cond+D" }
+        };
+        let currentOrder = ["A", "B", "C", "D"];
+
+        // ページ読み込み時に実行
+        window.onload = function() {
+            renderGrid();
+            populateSettings();
         };
 
-        // 参加者が実施した「実際の順番」で条件IDを配列に記述します
-        // ※実験プログラムからURLパラメータ等で受け取る場合はここを動的に書き換えます
-        // 例: ["condC", "condA", "condD", "condB"]
-        const experimentOrder = [
-            { id: "condA", name: "条件A：PC環境・視覚あり" },
-            { id: "condB", name: "条件B：PC環境・視覚なし" },
-            { id: "condC", name: "条件C：VR環境・視覚あり" },
-            { id: "condD", name: "条件D：VR環境・視覚なし" }
-        ];
+        // 画面描画関数
+        function renderGrid() {
+            const container = document.getElementById('display-area');
+            container.innerHTML = ""; // クリア
 
-        // ==========================================
-        // 描画処理プログラム
-        // ==========================================
-        const container = document.getElementById('display-area');
+            currentOrder.forEach((condKey, index) => {
+                const data = conditions[condKey];
+                const html = `
+                    <div class="card">
+                        <div class="order-badge">${index + 1}番目</div>
+                        <img src="${data.img}" alt="${data.name}" class="condition-image">
+                        <div class="condition-name">${data.name}</div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', html);
+            });
+        }
 
-        experimentOrder.forEach((item, index) => {
-            // 画像URLを取得（設定されていなければダミー）
-            const imageUrl = images[item.id] || "https://placehold.jp/300x200.png?text=No+Image";
+        // 設定画面を開く
+        function openSettings() {
+            document.getElementById('settings-modal').style.display = 'block';
+        }
 
-            // HTML要素を作成
-            const cardHTML = `
-                <div class="card">
-                    <div class="order-badge">${index + 1}番目</div>
-                    <img src="${imageUrl}" alt="${item.name}" class="condition-image">
-                    <div class="condition-name">${item.name}</div>
-                </div>
-            `;
+        // 設定画面に現在の値をセットする
+        function populateSettings() {
+            // 名前
+            ['A', 'B', 'C', 'D'].forEach(key => {
+                document.getElementById(`name-${key}`).value = conditions[key].name;
+            });
+            // 順番
+            currentOrder.forEach((condKey, index) => {
+                document.getElementById(`order-${index + 1}`).value = condKey;
+            });
+        }
 
-            // コンテナに追加
-            container.insertAdjacentHTML('beforeend', cardHTML);
-        });
+        // 保存して閉じる
+        async function saveAndClose() {
+            const keys = ['A', 'B', 'C', 'D'];
+            
+            // 1. 名前の更新と画像の読み込み
+            for (let key of keys) {
+                // 名前の更新
+                conditions[key].name = document.getElementById(`name-${key}`).value;
 
+                // 画像の更新（ファイルが選択されている場合のみ）
+                const fileInput = document.getElementById(`file-${key}`);
+                if (fileInput.files && fileInput.files[0]) {
+                    const base64 = await readFileAsDataURL(fileInput.files[0]);
+                    conditions[key].img = base64;
+                }
+            }
+
+            // 2. 順番の更新
+            const newOrder = [];
+            for (let i = 1; i <= 4; i++) {
+                newOrder.push(document.getElementById(`order-${i}`).value);
+            }
+            currentOrder = newOrder;
+
+            // 3. 再描画とモーダル閉じる
+            renderGrid();
+            document.getElementById('settings-modal').style.display = 'none';
+        }
+
+        // ファイルをBase64に変換するヘルパー関数
+        function readFileAsDataURL(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
     </script>
 </body>
 </html>
