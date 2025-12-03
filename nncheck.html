@@ -84,7 +84,7 @@
 
         /* 設定モーダル */
         #settings-modal {
-            display: none; /* 初期状態は非表示 */
+            display: none;
             position: fixed;
             top: 0; left: 0;
             width: 100%; height: 100%;
@@ -164,24 +164,24 @@
                 <h3>1. 条件の定義（名前と画像）</h3>
                 <p style="font-size:0.9em; color:#666;">※画像を選択しない場合はそのままになります。</p>
                 <div class="input-group">
-                    <label>条件A</label>
-                    <input type="text" id="name-A" placeholder="例: PC・視覚あり">
-                    <input type="file" id="file-A" accept="image/*">
+                    <label>条件1</label>
+                    <input type="text" id="name-1" placeholder="例: PC・視覚あり">
+                    <input type="file" id="file-1" accept="image/*">
                 </div>
                 <div class="input-group">
-                    <label>条件B</label>
-                    <input type="text" id="name-B" placeholder="例: PC・視覚なし">
-                    <input type="file" id="file-B" accept="image/*">
+                    <label>条件2</label>
+                    <input type="text" id="name-2" placeholder="例: PC・視覚なし">
+                    <input type="file" id="file-2" accept="image/*">
                 </div>
                 <div class="input-group">
-                    <label>条件C</label>
-                    <input type="text" id="name-C" placeholder="例: VR・視覚あり">
-                    <input type="file" id="file-C" accept="image/*">
+                    <label>条件3</label>
+                    <input type="text" id="name-3" placeholder="例: VR・視覚あり">
+                    <input type="file" id="file-3" accept="image/*">
                 </div>
                 <div class="input-group">
-                    <label>条件D</label>
-                    <input type="text" id="name-D" placeholder="例: VR・視覚なし">
-                    <input type="file" id="file-D" accept="image/*">
+                    <label>条件4</label>
+                    <input type="text" id="name-4" placeholder="例: VR・視覚なし">
+                    <input type="file" id="file-4" accept="image/*">
                 </div>
             </div>
 
@@ -191,37 +191,37 @@
                     <div class="order-row">
                         <span>1番目:</span>
                         <select id="order-1">
-                            <option value="A">条件A</option>
-                            <option value="B">条件B</option>
-                            <option value="C">条件C</option>
-                            <option value="D">条件D</option>
+                            <option value="1">条件1</option>
+                            <option value="2">条件2</option>
+                            <option value="3">条件3</option>
+                            <option value="4">条件4</option>
                         </select>
                     </div>
                     <div class="order-row">
                         <span>2番目:</span>
                         <select id="order-2">
-                            <option value="A">条件A</option>
-                            <option value="B" selected>条件B</option>
-                            <option value="C">条件C</option>
-                            <option value="D">条件D</option>
+                            <option value="1">条件1</option>
+                            <option value="2" selected>条件2</option>
+                            <option value="3">条件3</option>
+                            <option value="4">条件4</option>
                         </select>
                     </div>
                     <div class="order-row">
                         <span>3番目:</span>
                         <select id="order-3">
-                            <option value="A">条件A</option>
-                            <option value="B">条件B</option>
-                            <option value="C" selected>条件C</option>
-                            <option value="D">条件D</option>
+                            <option value="1">条件1</option>
+                            <option value="2">条件2</option>
+                            <option value="3" selected>条件3</option>
+                            <option value="4">条件4</option>
                         </select>
                     </div>
                     <div class="order-row">
                         <span>4番目:</span>
                         <select id="order-4">
-                            <option value="A">条件A</option>
-                            <option value="B">条件B</option>
-                            <option value="C">条件C</option>
-                            <option value="D" selected>条件D</option>
+                            <option value="1">条件1</option>
+                            <option value="2">条件2</option>
+                            <option value="3">条件3</option>
+                            <option value="4" selected>条件4</option>
                         </select>
                     </div>
                 </div>
@@ -232,14 +232,14 @@
     </div>
 
     <script>
-        // デフォルトデータ
+        // デフォルトデータ（キーを1,2,3,4に変更）
         let conditions = {
-            A: { name: "条件A (PC/視覚あり)", img: "https://placehold.jp/300x200.png?text=Cond+A" },
-            B: { name: "条件B (PC/視覚なし)", img: "https://placehold.jp/3d4070/ffffff/300x200.png?text=Cond+B" },
-            C: { name: "条件C (VR/視覚あり)", img: "https://placehold.jp/703d40/ffffff/300x200.png?text=Cond+C" },
-            D: { name: "条件D (VR/視覚なし)", img: "https://placehold.jp/407044/ffffff/300x200.png?text=Cond+D" }
+            1: { name: "条件1 (PC/視覚あり)", img: "https://placehold.jp/300x200.png?text=Cond+1" },
+            2: { name: "条件2 (PC/視覚なし)", img: "https://placehold.jp/3d4070/ffffff/300x200.png?text=Cond+2" },
+            3: { name: "条件3 (VR/視覚あり)", img: "https://placehold.jp/703d40/ffffff/300x200.png?text=Cond+3" },
+            4: { name: "条件4 (VR/視覚なし)", img: "https://placehold.jp/407044/ffffff/300x200.png?text=Cond+4" }
         };
-        let currentOrder = ["A", "B", "C", "D"];
+        let currentOrder = ["1", "2", "3", "4"];
 
         // ページ読み込み時に実行
         window.onload = function() {
@@ -273,7 +273,7 @@
         // 設定画面に現在の値をセットする
         function populateSettings() {
             // 名前
-            ['A', 'B', 'C', 'D'].forEach(key => {
+            ['1', '2', '3', '4'].forEach(key => {
                 document.getElementById(`name-${key}`).value = conditions[key].name;
             });
             // 順番
@@ -284,7 +284,7 @@
 
         // 保存して閉じる
         async function saveAndClose() {
-            const keys = ['A', 'B', 'C', 'D'];
+            const keys = ['1', '2', '3', '4'];
             
             // 1. 名前の更新と画像の読み込み
             for (let key of keys) {
