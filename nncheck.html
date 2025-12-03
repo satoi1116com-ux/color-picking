@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>実験条件の振り返り</title>
+    <style>
+        body {
+            font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+            color: #333;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+
+        p.description {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #666;
+        }
+
+        /* 4つの条件をグリッドで表示 */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr); /* 2列 x 2行 */
+            gap: 20px;
+        }
+
+        @media (max-width: 600px) {
+            .grid-container {
+                grid-template-columns: 1fr; /* スマホでは1列 */
+            }
+        }
+
+        .card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .order-badge {
+            background-color: #007bff;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+
+        .condition-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover; /* 画像の比率を保ちつつ枠に収める */
+            background-color: #eee;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+        }
+
+        .condition-name {
+            font-size: 1.2em;
+            font-weight: bold;
+            text-align: center;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>実験条件の確認</h1>
+    <p class="description">以下の順序で実験を行いました。アンケート回答時の参考にしてください。</p>
+
+    <div id="display-area" class="grid-container">
+        </div>
+
+    <script>
+        // ==========================================
+        // 【設定エリア】ここを書き換えてください
+        // ==========================================
+
+        // 画像のパスを実際のファイル名（例: 'img/vr_condition.png'）に変更してください
+        // 現在はダミー画像URLを入れています
+        const images = {
+            condA: "https://placehold.jp/300x200.png?text=条件Aの画像", 
+            condB: "https://placehold.jp/3d4070/ffffff/300x200.png?text=条件Bの画像",
+            condC: "https://placehold.jp/703d40/ffffff/300x200.png?text=条件Cの画像",
+            condD: "https://placehold.jp/407044/ffffff/300x200.png?text=条件Dの画像"
+        };
+
+        // 参加者が実施した「実際の順番」で条件IDを配列に記述します
+        // ※実験プログラムからURLパラメータ等で受け取る場合はここを動的に書き換えます
+        // 例: ["condC", "condA", "condD", "condB"]
+        const experimentOrder = [
+            { id: "condA", name: "条件A：PC環境・視覚あり" },
+            { id: "condB", name: "条件B：PC環境・視覚なし" },
+            { id: "condC", name: "条件C：VR環境・視覚あり" },
+            { id: "condD", name: "条件D：VR環境・視覚なし" }
+        ];
+
+        // ==========================================
+        // 描画処理プログラム
+        // ==========================================
+        const container = document.getElementById('display-area');
+
+        experimentOrder.forEach((item, index) => {
+            // 画像URLを取得（設定されていなければダミー）
+            const imageUrl = images[item.id] || "https://placehold.jp/300x200.png?text=No+Image";
+
+            // HTML要素を作成
+            const cardHTML = `
+                <div class="card">
+                    <div class="order-badge">${index + 1}番目</div>
+                    <img src="${imageUrl}" alt="${item.name}" class="condition-image">
+                    <div class="condition-name">${item.name}</div>
+                </div>
+            `;
+
+            // コンテナに追加
+            container.insertAdjacentHTML('beforeend', cardHTML);
+        });
+
+    </script>
+</body>
+</html>
